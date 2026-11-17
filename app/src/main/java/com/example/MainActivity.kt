@@ -14,20 +14,14 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccessTime
@@ -40,9 +34,6 @@ import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.NavigationRailItemDefaults
@@ -73,24 +64,30 @@ import com.example.ui.components.AnimatedIntroOverlay
 import com.example.ui.components.LocationPickerSheet
 import com.example.ui.components.WaqtAmbientBackground
 import com.example.ui.components.WaqtGlassBarSurface
+import com.example.ui.components.WaqtGlassNavItem
+import com.example.ui.components.WaqtSlidingGlassBottomBar
 import com.example.ui.components.waqtPressScale
 import com.example.ui.screens.AlarmsScreen
 import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.SehriIftarScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.strings.WaqtStrings
-import com.example.ui.theme.WaqtGold
+import com.example.ui.theme.PrayerAsrAccent
+import com.example.ui.theme.WaqtGoldBright
+import com.example.ui.theme.WaqtTeal
 import com.example.ui.theme.WaqtTheme
+import com.example.ui.theme.WaqtViolet
 
 private enum class WaqtDestination(
     val route: String,
     val selectedIcon: ImageVector,
-    val unselectedIcon: ImageVector
+    val unselectedIcon: ImageVector,
+    val accentColor: Color
 ) {
-    TODAY("today", Icons.Rounded.AccessTimeFilled, Icons.Outlined.AccessTime),
-    SEHRI_IFTAR("sehri_iftar", Icons.Rounded.NightsStay, Icons.Outlined.NightsStay),
-    ALARMS("alarms", Icons.Rounded.Notifications, Icons.Outlined.Notifications),
-    SETTINGS("settings", Icons.Rounded.Settings, Icons.Outlined.Settings);
+    TODAY("today", Icons.Rounded.AccessTimeFilled, Icons.Outlined.AccessTime, WaqtGoldBright),
+    SEHRI_IFTAR("sehri_iftar", Icons.Rounded.NightsStay, Icons.Outlined.NightsStay, WaqtTeal),
+    ALARMS("alarms", Icons.Rounded.Notifications, Icons.Outlined.Notifications, PrayerAsrAccent),
+    SETTINGS("settings", Icons.Rounded.Settings, Icons.Outlined.Settings, WaqtViolet);
 
     fun label(strings: WaqtStrings): String = when (this) {
         TODAY -> strings.navToday
@@ -169,6 +166,22 @@ fun WaqtApp(viewModel: MainViewModel) {
         }
     }
 
+    val navItems = remember(strings) {
+        WaqtDestination.entries.map { dest ->
+            WaqtGlassNavItem(
+                route = dest.route,
+                label = dest.label(strings),
+                selectedIcon = dest.selectedIcon,
+                unselectedIcon = dest.unselectedIcon,
+                accentColor = dest.accentColor,
+                testTag = "nav_${dest.route}"
+            )
+        }
+    }
+    val selectedIndex = remember(currentRoute) {
+        WaqtDestination.entries.indexOfFirst { it.route == currentRoute }.coerceAtLeast(0)
+    }
+
     WaqtTheme(themeMode = uiState.settings.themeMode) {
         WaqtAmbientBackground(themeMode = uiState.settings.themeMode) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -180,62 +193,12 @@ fun WaqtApp(viewModel: MainViewModel) {
                     containerColor = Color.Transparent,
                     bottomBar = {
                         if (!useNavRail) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .windowInsetsPadding(
-                                        WindowInsets.navigationBars.only(
-                                            WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal
-                                        )
-                                    )
-                                    .padding(horizontal = 12.dp, vertical = 8.dp)
-                            ) {
-                                WaqtGlassBarSurface(
-                                    shape = RoundedCornerShape(26.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    NavigationBar(
-                                        containerColor = Color.Transparent,
-                                        tonalElevation = 0.dp,
-                                        windowInsets = WindowInsets(0, 0, 0, 0)
-                                    ) {
-                                        WaqtDestination.entries.forEach { dest ->
-                                            val selected = currentRoute == dest.route
-                                            val label = dest.label(strings)
-                                            val itemInteraction = remember { MutableInteractionSource() }
-                                            NavigationBarItem(
-                                                selected = selected,
-                                                onClick = { navigateTo(dest.route) },
-                                                interactionSource = itemInteraction,
-                                                icon = {
-                                                    Icon(
-                                                        imageVector = if (selected) dest.selectedIcon else dest.unselectedIcon,
-                                                        contentDescription = label
-                                                    )
-                                                },
-                                                label = {
-                                                    Text(
-                                                        text = label,
-                                                        maxLines = 1,
-                                                        softWrap = false,
-                                                        overflow = TextOverflow.Ellipsis
-                                                    )
-                                                },
-                                                colors = NavigationBarItemDefaults.colors(
-                                                    selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    indicatorColor = WaqtGold.copy(alpha = 0.24f)
-                                                ),
-                                                modifier = Modifier
-                                                    .waqtPressScale(itemInteraction, reduceMotion)
-                                                    .testTag("nav_${dest.route}")
-                                            )
-                                        }
-                                    }
-                                }
-                            }
+                            WaqtSlidingGlassBottomBar(
+                                items = navItems,
+                                selectedIndex = selectedIndex,
+                                reduceMotion = reduceMotion,
+                                onSelectRoute = navigateTo
+                            )
                         }
                     }
                 ) { innerPadding ->
@@ -280,7 +243,11 @@ fun WaqtApp(viewModel: MainViewModel) {
                                                 )
                                             },
                                             colors = NavigationRailItemDefaults.colors(
-                                                indicatorColor = WaqtGold.copy(alpha = 0.24f)
+                                                selectedIconColor = dest.accentColor,
+                                                selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                indicatorColor = dest.accentColor.copy(alpha = 0.22f)
                                             ),
                                             modifier = Modifier
                                                 .waqtPressScale(railInteraction, reduceMotion)
@@ -369,6 +336,9 @@ fun WaqtApp(viewModel: MainViewModel) {
                                     onSelectLanguage = viewModel::setLanguage,
                                     onSelectThemeMode = viewModel::setThemeMode,
                                     onToggleReduceMotion = viewModel::setReduceMotion,
+                                    onToggle24HourFormat = viewModel::setUse24HourFormat,
+                                    onSelectHijriOffset = viewModel::setHijriOffsetDays,
+                                    onSelectSehriBuffer = viewModel::setSehriBufferMinutes,
                                     onOpenLocationPicker = openLocationPicker,
                                     onSelectMethod = viewModel::setCalculationMethod,
                                     onSelectAsrJuristic = viewModel::setAsrJuristic,

@@ -84,27 +84,24 @@ import com.example.ui.components.WaqtGlassCard
 import com.example.ui.components.waqtPressScale
 import com.example.ui.strings.WaqtStrings
 import com.example.ui.theme.PrayerAsrAccent
-import com.example.ui.theme.PrayerAsrTintDark
-import com.example.ui.theme.PrayerAsrTintLight
+import com.example.ui.theme.PrayerAsrGlow
 import com.example.ui.theme.PrayerDhuhrAccent
-import com.example.ui.theme.PrayerDhuhrTintDark
-import com.example.ui.theme.PrayerDhuhrTintLight
+import com.example.ui.theme.PrayerDhuhrGlow
 import com.example.ui.theme.PrayerFajrAccent
-import com.example.ui.theme.PrayerFajrTintDark
-import com.example.ui.theme.PrayerFajrTintLight
+import com.example.ui.theme.PrayerFajrGlow
 import com.example.ui.theme.PrayerIshaAccent
-import com.example.ui.theme.PrayerIshaTintDark
-import com.example.ui.theme.PrayerIshaTintLight
+import com.example.ui.theme.PrayerIshaGlow
 import com.example.ui.theme.PrayerMaghribAccent
-import com.example.ui.theme.PrayerMaghribTintDark
-import com.example.ui.theme.PrayerMaghribTintLight
+import com.example.ui.theme.PrayerMaghribGlow
+import com.example.ui.theme.WaqtCyan
 import com.example.ui.theme.WaqtEmerald
 import com.example.ui.theme.WaqtGold
 import com.example.ui.theme.WaqtGoldBright
+import com.example.ui.theme.WaqtGoldDark
 import com.example.ui.theme.WaqtGoldSoft
 import com.example.ui.theme.WaqtNavy
-import com.example.ui.theme.WaqtNavyCard
 import com.example.ui.theme.WaqtNavyDeep
+import com.example.ui.theme.WaqtViolet
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -112,7 +109,7 @@ import kotlinx.coroutines.flow.map
 @Immutable
 private data class PrayerCardPalette(
     val accent: Color,
-    val container: Color,
+    val glow: Color,
     val icon: ImageVector
 )
 
@@ -206,7 +203,7 @@ fun HomeScreen(
                 )
             }
 
-            // Translucent Glassmorphic WAQT Hero Section (1-second countdown isolated inside)
+            // Pure Crystal-Glass WAQT Hero Section (1-second countdown isolated inside)
             if (schedule != null && periodSummary.available) {
                 item(key = "hero_card", contentType = "hero") {
                     HeroCountdownCard(
@@ -216,22 +213,29 @@ fun HomeScreen(
                         liveClockFlow = liveClockFlow,
                         dateLabel = dateLabel,
                         hijriLabel = hijriLabel,
+                        isDark = isDark,
+                        use24HourFormat = settings.use24HourFormat,
+                        sehriBufferMinutes = settings.sehriBufferMinutes,
                         strings = strings
                     )
                 }
 
-                // Five Distinct Color Glass Prayer Cards (zero per-second recomposition!)
+                // Five Colorful Crystal-Glass Prayer Cards (zero per-second recomposition!)
                 items(
                     items = PrayerType.entries,
                     key = { it.name },
                     contentType = { "prayer_card" }
                 ) { prayer ->
-                    val palette = remember(prayer, isDark) { prayerPalette(prayer, isDark) }
+                    val palette = remember(prayer) { prayerPalette(prayer) }
                     val isCurrent = periodSummary.currentPrayer == prayer
                     val isNext = periodSummary.nextPrayer == prayer
                     val isAlertEnabled = prayer in settings.enabledPrayers
-                    val timeText = remember(schedule, prayer, settings.language) {
-                        BengaliFormatter.formatTime(schedule.timeFor(prayer), settings.language)
+                    val timeText = remember(schedule, prayer, settings.language, settings.use24HourFormat) {
+                        BengaliFormatter.formatTime(
+                            time = schedule.timeFor(prayer),
+                            language = settings.language,
+                            use24Hour = settings.use24HourFormat
+                        )
                     }
 
                     PrayerColorCard(
@@ -249,14 +253,16 @@ fun HomeScreen(
                 }
             }
 
-            // Dedicated Tahajjud Prayer Section
+            // Dedicated Colorful Aurora-Glass Tahajjud Prayer Section
             uiState.tahajjudSchedule?.let { tahajjud ->
                 item(key = "tahajjud_section", contentType = "tahajjud") {
                     TahajjudGlassCard(
                         tahajjud = tahajjud,
+                        isDark = isDark,
                         isActiveNow = isTahajjudActive,
                         isAlarmEnabled = settings.tahajjudAlertEnabled,
                         language = settings.language,
+                        use24HourFormat = settings.use24HourFormat,
                         reduceMotion = settings.reduceMotion,
                         strings = strings,
                         onToggleAlarm = { onToggleTahajjudAlert(!settings.tahajjudAlertEnabled) }
@@ -281,7 +287,8 @@ private fun WaqtHeaderBar(
     val locationInteraction = remember { MutableInteractionSource() }
 
     WaqtGlassCard(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(22.dp),
+        accentColor = WaqtGoldBright,
         modifier = modifier.fillMaxWidth()
     ) {
         Row(
@@ -451,33 +458,57 @@ private fun HeroCountdownCard(
     liveClockFlow: StateFlow<LiveClockState>,
     dateLabel: String,
     hijriLabel: String,
+    isDark: Boolean,
+    use24HourFormat: Boolean,
+    sehriBufferMinutes: Int,
     strings: WaqtStrings,
     modifier: Modifier = Modifier
 ) {
-    val borderBrush = remember {
+    val borderBrush = remember(isDark) {
         Brush.verticalGradient(
             listOf(
-                WaqtGoldBright.copy(alpha = 0.68f),
-                WaqtGold.copy(alpha = 0.22f)
+                Color.White.copy(alpha = if (isDark) 0.56f else 0.98f),
+                WaqtGoldBright.copy(alpha = if (isDark) 0.42f else 0.55f)
             )
         )
     }
-    val heroFillBrush = remember {
-        Brush.linearGradient(
-            colors = listOf(
-                WaqtNavyDeep.copy(alpha = 0.70f),
-                WaqtNavy.copy(alpha = 0.62f),
-                WaqtNavyCard.copy(alpha = 0.56f)
+    // Pure crystal translucent glass gradient (high transparency so ambient aurora shines through cleanly)
+    val heroFillBrush = remember(isDark) {
+        if (isDark) {
+            Brush.linearGradient(
+                colors = listOf(
+                    Color.White.copy(alpha = 0.16f),
+                    WaqtCyan.copy(alpha = 0.14f),
+                    WaqtViolet.copy(alpha = 0.12f),
+                    WaqtGold.copy(alpha = 0.10f)
+                )
             )
-        )
+        } else {
+            Brush.linearGradient(
+                colors = listOf(
+                    Color.White.copy(alpha = 0.60f),
+                    WaqtCyan.copy(alpha = 0.10f),
+                    WaqtGoldBright.copy(alpha = 0.14f)
+                )
+            )
+        }
+    }
+    val primaryTextColor = if (isDark) Color.White else WaqtNavyDeep
+    val secondaryTextColor = if (isDark) Color.White.copy(alpha = 0.80f) else WaqtNavy.copy(alpha = 0.78f)
+    val accentTextColor = if (isDark) WaqtGoldBright else WaqtGoldDark
+    val dateTextColor = if (isDark) WaqtGoldSoft else WaqtGoldDark
+    val innerChipBg = if (isDark) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.56f)
+    val innerChipBorder = if (isDark) Color.White.copy(alpha = 0.24f) else Color.White.copy(alpha = 0.92f)
+    val sehriTime = remember(schedule, sehriBufferMinutes) {
+        schedule.sehriEnd.minusMinutes(sehriBufferMinutes.toLong())
     }
 
     Card(
         modifier = modifier
             .fillMaxWidth()
             .testTag("hero_countdown_card"),
-        shape = RoundedCornerShape(26.dp),
-        border = BorderStroke(width = 1.2.dp, brush = borderBrush),
+        shape = RoundedCornerShape(28.dp),
+        border = BorderStroke(width = 1.25.dp, brush = borderBrush),
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
@@ -492,6 +523,14 @@ private fun HeroCountdownCard(
                     val orbitRadius = h * 0.44f
                     val glowStroke = Stroke(width = 1.2.dp.toPx())
                     val archStroke = Stroke(width = 1.5.dp.toPx())
+                    val sheenBrush = Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = if (isDark) 0.14f else 0.34f),
+                            Color.Transparent
+                        ),
+                        start = Offset(0f, 0f),
+                        end = Offset(w * 0.68f, h * 0.52f)
+                    )
                     val starPos = Offset(
                         orbitCenter.x - orbitRadius * 0.72f,
                         orbitCenter.y + orbitRadius * 0.68f
@@ -501,25 +540,27 @@ private fun HeroCountdownCard(
                         quadraticTo(w * 0.78f, h * 0.44f, w, h * 0.72f)
                     }
                     onDrawBehind {
+                        // Subtle top-left glass specular reflection sheen
+                        drawRect(brush = sheenBrush)
                         drawCircle(
-                            color = WaqtGold.copy(alpha = 0.08f),
+                            color = WaqtGold.copy(alpha = if (isDark) 0.10f else 0.14f),
                             radius = orbitRadius * 1.24f,
                             center = orbitCenter
                         )
                         drawCircle(
-                            color = WaqtGold.copy(alpha = 0.16f),
+                            color = WaqtGold.copy(alpha = if (isDark) 0.20f else 0.28f),
                             radius = orbitRadius,
                             center = orbitCenter,
                             style = glowStroke
                         )
                         drawCircle(
-                            color = WaqtGoldBright.copy(alpha = 0.85f),
+                            color = accentTextColor.copy(alpha = 0.85f),
                             radius = 3.dp.toPx(),
                             center = starPos
                         )
                         drawPath(
                             path = arch,
-                            color = WaqtGoldSoft.copy(alpha = 0.14f),
+                            color = accentTextColor.copy(alpha = 0.18f),
                             style = archStroke
                         )
                     }
@@ -539,14 +580,15 @@ private fun HeroCountdownCard(
                         Text(
                             text = dateLabel,
                             style = MaterialTheme.typography.labelLarge,
-                            color = WaqtGoldSoft,
+                            fontWeight = FontWeight.SemiBold,
+                            color = dateTextColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = hijriLabel,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White.copy(alpha = 0.80f),
+                            color = secondaryTextColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -554,11 +596,11 @@ private fun HeroCountdownCard(
 
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    // Current Waqt Glass Pill
+                    // Current Waqt Crystal Glass Pill
                     Surface(
-                        color = Color.White.copy(alpha = 0.12f),
+                        color = innerChipBg,
                         shape = RoundedCornerShape(50),
-                        border = BorderStroke(1.dp, WaqtGold.copy(alpha = 0.45f))
+                        border = BorderStroke(1.dp, innerChipBorder)
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
@@ -568,7 +610,7 @@ private fun HeroCountdownCard(
                                 modifier = Modifier
                                     .size(7.dp)
                                     .clip(CircleShape)
-                                    .background(WaqtGoldBright)
+                                    .background(accentTextColor)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
@@ -578,7 +620,8 @@ private fun HeroCountdownCard(
                                     strings.noFardWaqtLabel
                                 },
                                 style = MaterialTheme.typography.labelMedium,
-                                color = WaqtGoldSoft,
+                                fontWeight = FontWeight.SemiBold,
+                                color = primaryTextColor,
                                 maxLines = 1,
                                 softWrap = false,
                                 overflow = TextOverflow.Ellipsis
@@ -598,14 +641,14 @@ private fun HeroCountdownCard(
                         Text(
                             text = strings.nextPrayerLabel,
                             style = MaterialTheme.typography.labelMedium,
-                            color = Color.White.copy(alpha = 0.76f),
+                            color = secondaryTextColor,
                             maxLines = 1
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         AnimatedContent(
                             targetState = strings.prayerName(nextPrayer),
                             transitionSpec = {
-                                fadeIn(tween(200)) togetherWith fadeOut(tween(150))
+                                fadeIn(tween(180)) togetherWith fadeOut(tween(140))
                             },
                             label = "next_prayer_title"
                         ) { label ->
@@ -615,18 +658,20 @@ private fun HeroCountdownCard(
                                     fontSize = 25.sp,
                                     fontWeight = FontWeight.Bold
                                 ),
-                                color = Color.White,
+                                color = primaryTextColor,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
                         Text(
                             text = BengaliFormatter.formatTime(
-                                schedule.timeFor(nextPrayer),
-                                strings.language
+                                time = schedule.timeFor(nextPrayer),
+                                language = strings.language,
+                                use24Hour = use24HourFormat
                             ),
                             style = MaterialTheme.typography.titleMedium,
-                            color = WaqtGoldBright,
+                            fontWeight = FontWeight.Bold,
+                            color = accentTextColor,
                             maxLines = 1
                         )
                     }
@@ -636,6 +681,7 @@ private fun HeroCountdownCard(
                     // Isolated 1-second leaf composable — strict single-line compact countdown
                     HeroLiveCountdownValue(
                         liveClockFlow = liveClockFlow,
+                        isDark = isDark,
                         language = strings.language,
                         strings = strings
                     )
@@ -644,15 +690,15 @@ private fun HeroCountdownCard(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // Sleek GPU-only Horizontal Glass Waqt Progress Bar (zero layout invalidation per second)
-                HeroLiveProgressBar(liveClockFlow = liveClockFlow)
+                HeroLiveProgressBar(liveClockFlow = liveClockFlow, isDark = isDark)
 
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // Frosted Glass Bottom Strip inside Hero
                 Surface(
-                    color = Color.White.copy(alpha = 0.10f),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(0.8.dp, Color.White.copy(alpha = 0.14f)),
+                    color = innerChipBg,
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(0.9.dp, innerChipBorder),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -663,17 +709,36 @@ private fun HeroCountdownCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "${strings.sunriseLabel}: ${BengaliFormatter.formatTime(schedule.sunrise, strings.language)}",
+                            text = "${strings.sunriseLabel}: ${
+                                BengaliFormatter.formatTime(
+                                    time = schedule.sunrise,
+                                    language = strings.language,
+                                    use24Hour = use24HourFormat
+                                )
+                            }",
                             style = MaterialTheme.typography.labelMedium,
-                            color = Color.White.copy(alpha = 0.88f),
+                            color = primaryTextColor.copy(alpha = 0.90f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "${strings.sehriEndLabel}: ${BengaliFormatter.formatShortTime(schedule.sehriEnd, strings.language)} • ${strings.iftarStartLabel}: ${BengaliFormatter.formatShortTime(schedule.iftarStart, strings.language)}",
+                            text = "${strings.sehriEndLabel}: ${
+                                BengaliFormatter.formatShortTime(
+                                    time = sehriTime,
+                                    language = strings.language,
+                                    use24Hour = use24HourFormat
+                                )
+                            } • ${strings.iftarStartLabel}: ${
+                                BengaliFormatter.formatShortTime(
+                                    time = schedule.iftarStart,
+                                    language = strings.language,
+                                    use24Hour = use24HourFormat
+                                )
+                            }",
                             style = MaterialTheme.typography.labelMedium,
-                            color = WaqtGoldSoft,
+                            fontWeight = FontWeight.SemiBold,
+                            color = dateTextColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -687,6 +752,7 @@ private fun HeroCountdownCard(
 @Composable
 private fun HeroLiveCountdownValue(
     liveClockFlow: StateFlow<LiveClockState>,
+    isDark: Boolean,
     language: AppLanguage,
     strings: WaqtStrings
 ) {
@@ -695,19 +761,24 @@ private fun HeroLiveCountdownValue(
         BengaliFormatter.formatCountdown(it.countdown, language)
     } ?: "--:--:--"
 
+    val labelColor = if (isDark) Color.White.copy(alpha = 0.80f) else WaqtNavy.copy(alpha = 0.78f)
+    val pillColor = if (isDark) Color.White.copy(alpha = 0.14f) else Color.White.copy(alpha = 0.64f)
+    val pillBorder = if (isDark) WaqtGoldBright.copy(alpha = 0.48f) else WaqtGold.copy(alpha = 0.56f)
+    val valueColor = if (isDark) WaqtGoldBright else WaqtNavyDeep
+
     Column(horizontalAlignment = Alignment.End) {
         Text(
             text = strings.remainingLabel,
             style = MaterialTheme.typography.labelMedium,
-            color = Color.White.copy(alpha = 0.78f),
+            color = labelColor,
             maxLines = 1,
             softWrap = false
         )
         Spacer(modifier = Modifier.height(4.dp))
         Surface(
-            color = Color.White.copy(alpha = 0.10f),
-            shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, WaqtGold.copy(alpha = 0.42f))
+            color = pillColor,
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, pillBorder)
         ) {
             Text(
                 text = countdownText,
@@ -716,7 +787,7 @@ private fun HeroLiveCountdownValue(
                     fontWeight = FontWeight.Bold,
                     fontFeatureSettings = "tnum"
                 ),
-                color = WaqtGoldBright,
+                color = valueColor,
                 maxLines = 1,
                 softWrap = false,
                 overflow = TextOverflow.Clip,
@@ -730,13 +801,16 @@ private fun HeroLiveCountdownValue(
 
 @Composable
 private fun HeroLiveProgressBar(
-    liveClockFlow: StateFlow<LiveClockState>
+    liveClockFlow: StateFlow<LiveClockState>,
+    isDark: Boolean
 ) {
     val liveClock by liveClockFlow.collectAsStateWithLifecycle()
     val fraction = (liveClock.periodStatus?.elapsedFraction ?: 0f).coerceIn(0.03f, 1f)
-    val trackColor = remember { Color.White.copy(alpha = 0.14f) }
+    val trackColor = remember(isDark) {
+        if (isDark) Color.White.copy(alpha = 0.16f) else WaqtNavy.copy(alpha = 0.14f)
+    }
     val fillBrush = remember {
-        Brush.horizontalGradient(listOf(WaqtGold, WaqtGoldBright))
+        Brush.horizontalGradient(listOf(WaqtCyan, WaqtGold, WaqtGoldBright))
     }
 
     Canvas(
@@ -771,26 +845,52 @@ private fun PrayerColorCard(
     onToggleAlert: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val borderColor = when {
-        isCurrent -> palette.accent
-        isNext -> WaqtGold
-        else -> palette.accent.copy(alpha = 0.34f)
+    val borderBrush = remember(isDark, isCurrent, isNext, palette) {
+        when {
+            isCurrent -> Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.85f), palette.accent))
+            isNext -> Brush.verticalGradient(listOf(WaqtGoldBright, WaqtGold.copy(alpha = 0.55f)))
+            else -> Brush.verticalGradient(
+                listOf(
+                    Color.White.copy(alpha = if (isDark) 0.34f else 0.96f),
+                    palette.accent.copy(alpha = if (isDark) 0.36f else 0.40f)
+                )
+            )
+        }
     }
-    val cardContainerColor = palette.container.copy(alpha = if (isDark) 0.52f else 0.64f)
+    val glassFillBrush = remember(isDark, isCurrent, palette) {
+        if (isDark) {
+            Brush.linearGradient(
+                colors = listOf(
+                    palette.accent.copy(alpha = if (isCurrent) 0.30f else 0.20f),
+                    palette.glow.copy(alpha = if (isCurrent) 0.18f else 0.10f),
+                    Color.White.copy(alpha = 0.08f)
+                )
+            )
+        } else {
+            Brush.linearGradient(
+                colors = listOf(
+                    Color.White.copy(alpha = if (isCurrent) 0.68f else 0.58f),
+                    palette.accent.copy(alpha = if (isCurrent) 0.20f else 0.12f),
+                    palette.glow.copy(alpha = if (isCurrent) 0.18f else 0.10f)
+                )
+            )
+        }
+    }
     val bellInteraction = remember { MutableInteractionSource() }
 
     Card(
         modifier = modifier
             .fillMaxWidth()
             .testTag("prayer_card_${prayer.name.lowercase()}"),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = cardContainerColor),
-        border = BorderStroke(if (isCurrent || isNext) 1.6.dp else 1.dp, borderColor),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        border = BorderStroke(if (isCurrent || isNext) 1.5.dp else 1.dp, borderBrush),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .background(glassFillBrush)
                 .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -798,7 +898,14 @@ private fun PrayerColorCard(
                 modifier = Modifier
                     .size(44.dp)
                     .clip(CircleShape)
-                    .background(palette.accent.copy(alpha = 0.18f)),
+                    .background(
+                        Brush.linearGradient(
+                            listOf(
+                                palette.accent.copy(alpha = 0.28f),
+                                palette.glow.copy(alpha = 0.18f)
+                            )
+                        )
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -856,13 +963,20 @@ private fun PrayerColorCard(
                 )
             }
 
-            Text(
-                text = timeText,
-                style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
-                fontWeight = FontWeight.Bold,
-                color = palette.accent,
-                maxLines = 1
-            )
+            Surface(
+                color = palette.accent.copy(alpha = if (isDark) 0.18f else 0.12f),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(0.8.dp, palette.accent.copy(alpha = 0.34f))
+            ) {
+                Text(
+                    text = timeText,
+                    style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
+                    fontWeight = FontWeight.Bold,
+                    color = if (isDark) palette.glow else palette.accent,
+                    maxLines = 1,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                )
+            }
 
             Spacer(modifier = Modifier.width(4.dp))
 
@@ -891,34 +1005,58 @@ private fun PrayerColorCard(
 @Composable
 private fun TahajjudGlassCard(
     tahajjud: TahajjudSchedule,
+    isDark: Boolean,
     isActiveNow: Boolean,
     isAlarmEnabled: Boolean,
     language: AppLanguage,
+    use24HourFormat: Boolean,
     reduceMotion: Boolean,
     strings: WaqtStrings,
     onToggleAlarm: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val bellInteraction = remember { MutableInteractionSource() }
-    val cardBrush = remember {
-        Brush.linearGradient(
-            listOf(
-                Color(0xFF141D3D).copy(alpha = 0.66f),
-                Color(0xFF232C5C).copy(alpha = 0.58f)
+    val cardBrush = remember(isDark) {
+        if (isDark) {
+            Brush.linearGradient(
+                listOf(
+                    WaqtViolet.copy(alpha = 0.24f),
+                    WaqtCyan.copy(alpha = 0.12f),
+                    Color.White.copy(alpha = 0.08f)
+                )
             )
-        )
+        } else {
+            Brush.linearGradient(
+                listOf(
+                    Color.White.copy(alpha = 0.62f),
+                    WaqtViolet.copy(alpha = 0.15f),
+                    WaqtGoldBright.copy(alpha = 0.12f)
+                )
+            )
+        }
     }
+    val borderBrush = remember(isDark, isActiveNow) {
+        if (isActiveNow) {
+            Brush.verticalGradient(listOf(WaqtGoldBright, WaqtViolet))
+        } else {
+            Brush.verticalGradient(
+                listOf(
+                    Color.White.copy(alpha = if (isDark) 0.40f else 0.96f),
+                    WaqtViolet.copy(alpha = if (isDark) 0.42f else 0.36f)
+                )
+            )
+        }
+    }
+    val titleColor = if (isDark) Color.White else WaqtNavyDeep
+    val subColor = if (isDark) WaqtGoldSoft.copy(alpha = 0.88f) else WaqtNavy.copy(alpha = 0.78f)
 
     Card(
         modifier = modifier
             .fillMaxWidth()
             .testTag("tahajjud_section_card"),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-        border = BorderStroke(
-            width = if (isActiveNow) 1.8.dp else 1.1.dp,
-            color = if (isActiveNow) WaqtGoldBright else WaqtGold.copy(alpha = 0.42f)
-        ),
+        border = BorderStroke(if (isActiveNow) 1.6.dp else 1.1.dp, borderBrush),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
@@ -940,13 +1078,13 @@ private fun TahajjudGlassCard(
                         modifier = Modifier
                             .size(42.dp)
                             .clip(CircleShape)
-                            .background(WaqtGold.copy(alpha = 0.18f)),
+                            .background(WaqtViolet.copy(alpha = 0.22f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.AutoAwesome,
                             contentDescription = strings.tahajjudSectionTitle,
-                            tint = WaqtGoldBright,
+                            tint = if (isDark) WaqtGoldBright else WaqtViolet,
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -956,12 +1094,12 @@ private fun TahajjudGlassCard(
                             text = strings.tahajjudSectionTitle,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = titleColor
                         )
                         Text(
                             text = strings.tahajjudSubtitle,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = WaqtGoldSoft.copy(alpha = 0.85f)
+                            color = subColor
                         )
                     }
                 }
@@ -981,7 +1119,11 @@ private fun TahajjudGlassCard(
                             Icons.Outlined.NotificationsOff
                         },
                         contentDescription = strings.tahajjudAlertTitle,
-                        tint = if (isAlarmEnabled) WaqtGoldBright else Color.White.copy(alpha = 0.65f)
+                        tint = if (isAlarmEnabled) {
+                            if (isDark) WaqtGoldBright else WaqtViolet
+                        } else {
+                            subColor
+                        }
                     )
                 }
             }
@@ -1010,20 +1152,23 @@ private fun TahajjudGlassCard(
             ) {
                 TahajjudTimePill(
                     label = strings.tahajjudStartsLabel,
-                    value = BengaliFormatter.formatTime(tahajjud.startTime, language),
+                    value = BengaliFormatter.formatTime(tahajjud.startTime, language, use24HourFormat),
                     highlight = true,
+                    isDark = isDark,
                     modifier = Modifier.weight(1f)
                 )
                 TahajjudTimePill(
                     label = strings.tahajjudEndsLabel,
-                    value = BengaliFormatter.formatTime(tahajjud.endTime, language),
+                    value = BengaliFormatter.formatTime(tahajjud.endTime, language, use24HourFormat),
                     highlight = false,
+                    isDark = isDark,
                     modifier = Modifier.weight(1f)
                 )
                 TahajjudTimePill(
                     label = strings.islamicMidnightLabel,
-                    value = BengaliFormatter.formatTime(tahajjud.midnightTime, language),
+                    value = BengaliFormatter.formatTime(tahajjud.midnightTime, language, use24HourFormat),
                     highlight = false,
+                    isDark = isDark,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -1036,15 +1181,33 @@ private fun TahajjudTimePill(
     label: String,
     value: String,
     highlight: Boolean,
+    isDark: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val bgColor = when {
+        highlight && isDark -> WaqtGold.copy(alpha = 0.18f)
+        highlight && !isDark -> WaqtGold.copy(alpha = 0.22f)
+        isDark -> Color.White.copy(alpha = 0.10f)
+        else -> Color.White.copy(alpha = 0.52f)
+    }
+    val borderColor = if (highlight) {
+        WaqtGold.copy(alpha = 0.56f)
+    } else if (isDark) {
+        Color.White.copy(alpha = 0.18f)
+    } else {
+        Color.White.copy(alpha = 0.90f)
+    }
+    val valueColor = when {
+        highlight && isDark -> WaqtGoldBright
+        highlight && !isDark -> WaqtGoldDark
+        isDark -> Color.White
+        else -> WaqtNavyDeep
+    }
+
     Surface(
-        color = Color.White.copy(alpha = if (highlight) 0.14f else 0.08f),
+        color = bgColor,
         shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(
-            1.dp,
-            if (highlight) WaqtGold.copy(alpha = 0.50f) else Color.White.copy(alpha = 0.12f)
-        ),
+        border = BorderStroke(1.dp, borderColor),
         modifier = modifier
     ) {
         Column(
@@ -1054,7 +1217,7 @@ private fun TahajjudTimePill(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
-                color = WaqtGoldSoft.copy(alpha = 0.85f),
+                color = if (isDark) WaqtGoldSoft.copy(alpha = 0.88f) else WaqtNavy.copy(alpha = 0.76f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1063,7 +1226,7 @@ private fun TahajjudTimePill(
                 text = value,
                 style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
                 fontWeight = FontWeight.Bold,
-                color = if (highlight) WaqtGoldBright else Color.White,
+                color = valueColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1071,31 +1234,31 @@ private fun TahajjudTimePill(
     }
 }
 
-private fun prayerPalette(prayer: PrayerType, isDark: Boolean): PrayerCardPalette {
+private fun prayerPalette(prayer: PrayerType): PrayerCardPalette {
     return when (prayer) {
         PrayerType.FAJR -> PrayerCardPalette(
             accent = PrayerFajrAccent,
-            container = if (isDark) PrayerFajrTintDark else PrayerFajrTintLight,
+            glow = PrayerFajrGlow,
             icon = Icons.Rounded.WbTwilight
         )
         PrayerType.DHUHR -> PrayerCardPalette(
             accent = PrayerDhuhrAccent,
-            container = if (isDark) PrayerDhuhrTintDark else PrayerDhuhrTintLight,
+            glow = PrayerDhuhrGlow,
             icon = Icons.Rounded.WbSunny
         )
         PrayerType.ASR -> PrayerCardPalette(
             accent = PrayerAsrAccent,
-            container = if (isDark) PrayerAsrTintDark else PrayerAsrTintLight,
+            glow = PrayerAsrGlow,
             icon = Icons.Rounded.WbSunny
         )
         PrayerType.MAGHRIB -> PrayerCardPalette(
             accent = PrayerMaghribAccent,
-            container = if (isDark) PrayerMaghribTintDark else PrayerMaghribTintLight,
+            glow = PrayerMaghribGlow,
             icon = Icons.Rounded.WbTwilight
         )
         PrayerType.ISHA -> PrayerCardPalette(
             accent = PrayerIshaAccent,
-            container = if (isDark) PrayerIshaTintDark else PrayerIshaTintLight,
+            glow = PrayerIshaGlow,
             icon = Icons.Rounded.Bedtime
         )
     }

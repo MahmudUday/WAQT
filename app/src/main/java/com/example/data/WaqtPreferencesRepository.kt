@@ -49,6 +49,9 @@ class WaqtPreferencesRepository(context: Context) {
         val LANGUAGE = stringPreferencesKey("language")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val REDUCE_MOTION = booleanPreferencesKey("reduce_motion")
+        val USE_24_HOUR = booleanPreferencesKey("use_24_hour")
+        val HIJRI_OFFSET_DAYS = intPreferencesKey("hijri_offset_days")
+        val SEHRI_BUFFER_MINUTES = intPreferencesKey("sehri_buffer_minutes")
         val CALCULATION_METHOD = stringPreferencesKey("calculation_method")
         val ASR_JURISTIC = stringPreferencesKey("asr_juristic")
         val LOCATION_SOURCE = stringPreferencesKey("location_source")
@@ -115,6 +118,18 @@ class WaqtPreferencesRepository(context: Context) {
 
     suspend fun setReduceMotion(reduce: Boolean) {
         dataStore.edit { prefs -> prefs[Keys.REDUCE_MOTION] = reduce }
+    }
+
+    suspend fun setUse24HourFormat(use24Hour: Boolean) {
+        dataStore.edit { prefs -> prefs[Keys.USE_24_HOUR] = use24Hour }
+    }
+
+    suspend fun setHijriOffsetDays(offsetDays: Int) {
+        dataStore.edit { prefs -> prefs[Keys.HIJRI_OFFSET_DAYS] = offsetDays.coerceIn(-2, 2) }
+    }
+
+    suspend fun setSehriBufferMinutes(minutes: Int) {
+        dataStore.edit { prefs -> prefs[Keys.SEHRI_BUFFER_MINUTES] = minutes.coerceIn(0, 10) }
     }
 
     suspend fun setCalculationMethod(method: CalculationMethod) {
@@ -196,6 +211,9 @@ class WaqtPreferencesRepository(context: Context) {
             language = AppLanguage.fromCode(prefs[Keys.LANGUAGE]),
             themeMode = ThemeMode.fromId(prefs[Keys.THEME_MODE]),
             reduceMotion = prefs[Keys.REDUCE_MOTION] ?: false,
+            use24HourFormat = prefs[Keys.USE_24_HOUR] ?: false,
+            hijriOffsetDays = (prefs[Keys.HIJRI_OFFSET_DAYS] ?: 0).coerceIn(-2, 2),
+            sehriBufferMinutes = (prefs[Keys.SEHRI_BUFFER_MINUTES] ?: 0).coerceIn(0, 10),
             calculationMethod = CalculationMethod.fromId(prefs[Keys.CALCULATION_METHOD]),
             asrJuristic = AsrJuristic.fromId(prefs[Keys.ASR_JURISTIC]),
             locationSource = LocationSource.fromId(prefs[Keys.LOCATION_SOURCE]),

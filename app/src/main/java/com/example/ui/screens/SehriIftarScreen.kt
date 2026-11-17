@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bedtime
@@ -43,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
@@ -56,16 +59,24 @@ import com.example.data.BengaliFormatter
 import com.example.data.HijriCalendarHelper
 import com.example.model.AppLanguage
 import com.example.model.DailyPrayerSchedule
+import com.example.model.ThemeMode
 import com.example.ui.LiveClockState
 import com.example.ui.WaqtUiState
 import com.example.ui.components.WaqtGlassCard
 import com.example.ui.components.waqtPressScale
 import com.example.ui.strings.WaqtStrings
 import com.example.ui.theme.PrayerFajrAccent
+import com.example.ui.theme.PrayerFajrGlow
 import com.example.ui.theme.PrayerMaghribAccent
+import com.example.ui.theme.PrayerMaghribGlow
+import com.example.ui.theme.WaqtCyan
+import com.example.ui.theme.WaqtEmerald
+import com.example.ui.theme.WaqtEmeraldLight
 import com.example.ui.theme.WaqtGold
-import com.example.ui.theme.WaqtGoldSoft
-import com.example.ui.theme.WaqtNavy
+import com.example.ui.theme.WaqtGoldBright
+import com.example.ui.theme.WaqtGoldDark
+import com.example.ui.theme.WaqtNavyDeep
+import com.example.ui.theme.WaqtTeal
 import kotlinx.coroutines.flow.StateFlow
 import java.time.LocalDate
 import java.time.YearMonth
@@ -80,16 +91,24 @@ fun SehriIftarScreen(
     onOpenLocationPicker: () -> Unit,
     bottomBarPadding: Dp = 0.dp
 ) {
-    val lang = uiState.settings.language
-    val reduceMotion = uiState.settings.reduceMotion
+    val settings = uiState.settings
+    val lang = settings.language
+    val reduceMotion = settings.reduceMotion
+    val use24Hour = settings.use24HourFormat
+    val sehriBufferMins = settings.sehriBufferMinutes
+    val isDark = when (settings.themeMode) {
+        ThemeMode.DARK -> true
+        ThemeMode.LIGHT -> false
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+    }
     val selectedSchedule = uiState.selectedSehriSchedule ?: uiState.todaySchedule
     val locationLabel = if (lang == AppLanguage.BENGALI) {
-        uiState.settings.locationNameBn
+        settings.locationNameBn
     } else {
-        uiState.settings.locationNameEn
+        settings.locationNameEn
     }
-    val selectedHijri = remember(uiState.selectedSehriDate) {
-        HijriCalendarHelper.fromGregorian(uiState.selectedSehriDate)
+    val selectedHijri = remember(uiState.selectedSehriDate, settings.hijriOffsetDays) {
+        HijriCalendarHelper.fromGregorian(uiState.selectedSehriDate, settings.hijriOffsetDays)
     }
 
     val locationInteraction = remember { MutableInteractionSource() }
@@ -98,6 +117,27 @@ fun SehriIftarScreen(
     val nextDayInteraction = remember { MutableInteractionSource() }
     val prevMonthInteraction = remember { MutableInteractionSource() }
     val nextMonthInteraction = remember { MutableInteractionSource() }
+
+    val tableHeaderBrush = remember(isDark) {
+        if (isDark) {
+            Brush.linearGradient(
+                listOf(
+                    WaqtTeal.copy(alpha = 0.24f),
+                    WaqtGoldBright.copy(alpha = 0.14f),
+                    Color.White.copy(alpha = 0.08f)
+                )
+            )
+        } else {
+            Brush.linearGradient(
+                listOf(
+                    Color.White.copy(alpha = 0.68f),
+                    WaqtTeal.copy(alpha = 0.16f),
+                    WaqtGoldBright.copy(alpha = 0.18f)
+                )
+            )
+        }
+    }
+    val tableHeaderTextColor = if (isDark) WaqtGoldBright else WaqtNavyDeep
 
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -117,52 +157,64 @@ fun SehriIftarScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item(key = "header", contentType = "header") {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                WaqtGlassCard(
+                    accentColor = WaqtTeal,
+                    shape = RoundedCornerShape(22.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = strings.sehriIftarTitle,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = strings.sehriIftarSubtitle,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Surface(
-                        shape = RoundedCornerShape(50),
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.56f),
-                        border = BorderStroke(1.dp, WaqtGold.copy(alpha = 0.45f)),
+                    Row(
                         modifier = Modifier
-                            .waqtPressScale(locationInteraction, reduceMotion)
-                            .clip(RoundedCornerShape(50))
-                            .clickable(
-                                interactionSource = locationInteraction,
-                                indication = ripple(),
-                                onClick = onOpenLocationPicker
-                            )
-                            .testTag("sehri_location_chip")
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Rounded.LocationOn,
-                                contentDescription = strings.changeLocation,
-                                tint = WaqtGold,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = locationLabel,
-                                style = MaterialTheme.typography.labelLarge
+                                text = strings.sehriIftarTitle,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
                             )
+                            Text(
+                                text = strings.sehriIftarSubtitle,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = WaqtTeal.copy(alpha = if (isDark) 0.20f else 0.14f),
+                            border = BorderStroke(1.dp, WaqtTeal.copy(alpha = 0.50f)),
+                            modifier = Modifier
+                                .waqtPressScale(locationInteraction, reduceMotion)
+                                .clip(RoundedCornerShape(50))
+                                .clickable(
+                                    interactionSource = locationInteraction,
+                                    indication = ripple(),
+                                    onClick = onOpenLocationPicker
+                                )
+                                .testTag("sehri_location_chip")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.LocationOn,
+                                    contentDescription = strings.changeLocation,
+                                    tint = if (isDark) WaqtTeal else WaqtEmerald,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = locationLabel,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
                     }
                 }
@@ -172,12 +224,14 @@ fun SehriIftarScreen(
                 SehriCountdownBanner(
                     liveClockFlow = liveClockFlow,
                     language = lang,
+                    isDark = isDark,
                     strings = strings
                 )
             }
 
             item(key = "date_nav", contentType = "date_nav") {
                 WaqtGlassCard(
+                    accentColor = WaqtCyan,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -251,26 +305,37 @@ fun SehriIftarScreen(
 
             if (selectedSchedule != null) {
                 item(key = "sehri_iftar_cards", contentType = "boundary_cards") {
+                    val sehriCutoff = remember(selectedSchedule, sehriBufferMins) {
+                        selectedSchedule.sehriEnd.minusMinutes(sehriBufferMins.toLong())
+                    }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         FastingBoundaryCard(
                             title = strings.sehriEndLabel,
-                            time = BengaliFormatter.formatTime(selectedSchedule.sehriEnd, lang),
-                            note = strings.sehriCutoffNote,
+                            time = BengaliFormatter.formatTime(sehriCutoff, lang, use24Hour),
+                            note = if (sehriBufferMins > 0) {
+                                "${strings.sehriCutoffNote} (${strings.bufferMinutesLabel(sehriBufferMins)})"
+                            } else {
+                                strings.sehriCutoffNote
+                            },
                             accent = PrayerFajrAccent,
+                            glow = PrayerFajrGlow,
                             icon = Icons.Rounded.Bedtime,
+                            isDark = isDark,
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("sehri_time_card")
                         )
                         FastingBoundaryCard(
                             title = strings.iftarStartLabel,
-                            time = BengaliFormatter.formatTime(selectedSchedule.iftarStart, lang),
+                            time = BengaliFormatter.formatTime(selectedSchedule.iftarStart, lang, use24Hour),
                             note = strings.iftarCutoffNote,
                             accent = PrayerMaghribAccent,
+                            glow = PrayerMaghribGlow,
                             icon = Icons.Rounded.WbTwilight,
+                            isDark = isDark,
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("iftar_time_card")
@@ -332,35 +397,48 @@ fun SehriIftarScreen(
             }
 
             item(key = "table_columns", contentType = "table_header") {
-                Surface(
-                    color = WaqtNavy.copy(alpha = 0.70f),
-                    shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-                    border = BorderStroke(1.dp, WaqtGold.copy(alpha = 0.30f)),
+                Card(
+                    shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                    border = BorderStroke(
+                        1.dp,
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.White.copy(alpha = if (isDark) 0.40f else 0.96f),
+                                WaqtTeal.copy(alpha = 0.42f)
+                            )
+                        )
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                            .background(tableHeaderBrush)
+                            .padding(horizontal = 14.dp, vertical = 11.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
                             text = strings.colDate,
                             style = MaterialTheme.typography.labelLarge,
-                            color = WaqtGoldSoft,
+                            fontWeight = FontWeight.Bold,
+                            color = tableHeaderTextColor,
                             modifier = Modifier.weight(1.2f)
                         )
                         Text(
                             text = strings.colSehri,
                             style = MaterialTheme.typography.labelLarge,
-                            color = WaqtGoldSoft,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDark) PrayerFajrGlow else PrayerFajrAccent,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.weight(1f)
                         )
                         Text(
                             text = strings.colIftar,
                             style = MaterialTheme.typography.labelLarge,
-                            color = WaqtGoldSoft,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDark) PrayerMaghribGlow else PrayerMaghribAccent,
                             textAlign = TextAlign.End,
                             modifier = Modifier.weight(1f)
                         )
@@ -377,7 +455,10 @@ fun SehriIftarScreen(
                     schedule = daySchedule,
                     isToday = daySchedule.date == uiState.todayDate,
                     isSelected = daySchedule.date == uiState.selectedSehriDate,
+                    isDark = isDark,
                     language = lang,
+                    use24HourFormat = use24Hour,
+                    sehriBufferMinutes = sehriBufferMins,
                     onClick = { onSelectDate(daySchedule.date) }
                 )
             }
@@ -392,22 +473,57 @@ fun SehriIftarScreen(
 private fun SehriCountdownBanner(
     liveClockFlow: StateFlow<LiveClockState>,
     language: AppLanguage,
+    isDark: Boolean,
     strings: WaqtStrings,
     modifier: Modifier = Modifier
 ) {
     val liveClock by liveClockFlow.collectAsStateWithLifecycle()
     val target = liveClock.sehriIftarCountdown ?: return
 
+    val bannerBrush = remember(isDark, target.isSehriNext) {
+        val accent = if (target.isSehriNext) WaqtTeal else PrayerMaghribAccent
+        if (isDark) {
+            Brush.linearGradient(
+                listOf(
+                    Color.White.copy(alpha = 0.14f),
+                    accent.copy(alpha = 0.24f),
+                    WaqtGold.copy(alpha = 0.14f)
+                )
+            )
+        } else {
+            Brush.linearGradient(
+                listOf(
+                    Color.White.copy(alpha = 0.64f),
+                    accent.copy(alpha = 0.16f),
+                    WaqtGoldBright.copy(alpha = 0.18f)
+                )
+            )
+        }
+    }
+    val borderBrush = remember(isDark, target.isSehriNext) {
+        val accent = if (target.isSehriNext) WaqtTeal else PrayerMaghribAccent
+        Brush.verticalGradient(
+            listOf(
+                Color.White.copy(alpha = if (isDark) 0.50f else 0.98f),
+                accent.copy(alpha = 0.50f)
+            )
+        )
+    }
+    val labelColor = if (isDark) Color.White else WaqtNavyDeep
+    val countdownColor = if (isDark) WaqtGoldBright else WaqtGoldDark
+    val pillColor = if (isDark) Color.White.copy(alpha = 0.14f) else Color.White.copy(alpha = 0.72f)
+
     Card(
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = WaqtNavy.copy(alpha = 0.68f)),
-        border = BorderStroke(1.dp, WaqtGold.copy(alpha = 0.50f)),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        border = BorderStroke(1.2.dp, borderBrush),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .background(bannerBrush)
                 .padding(horizontal = 18.dp, vertical = 14.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
@@ -419,21 +535,30 @@ private fun SehriCountdownBanner(
                     strings.iftarCountdownPrefix
                 },
                 style = MaterialTheme.typography.titleMedium,
-                color = WaqtGoldSoft,
+                fontWeight = FontWeight.SemiBold,
+                color = labelColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
             Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = BengaliFormatter.formatCountdown(target.countdown, language),
-                style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
-                fontWeight = FontWeight.Bold,
-                color = WaqtGold,
-                maxLines = 1,
-                softWrap = false,
-                modifier = Modifier.testTag("sehri_iftar_countdown")
-            )
+            Surface(
+                color = pillColor,
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, WaqtGold.copy(alpha = 0.45f))
+            ) {
+                Text(
+                    text = BengaliFormatter.formatCountdown(target.countdown, language),
+                    style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
+                    fontWeight = FontWeight.Bold,
+                    color = countdownColor,
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier
+                        .padding(horizontal = 12.dp, vertical = 5.dp)
+                        .testTag("sehri_iftar_countdown")
+                )
+            }
         }
     }
 }
@@ -444,31 +569,50 @@ private fun FastingBoundaryCard(
     time: String,
     note: String,
     accent: Color,
+    glow: Color,
     icon: ImageVector,
+    isDark: Boolean,
     modifier: Modifier = Modifier
 ) {
     WaqtGlassCard(
         modifier = modifier,
-        borderColor = accent.copy(alpha = 0.45f),
-        borderWidth = 1.3.dp
+        accentColor = accent,
+        borderWidth = 1.25.dp
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = title,
-                    tint = accent,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
+                Box(
+                    modifier = Modifier
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.linearGradient(
+                                listOf(
+                                    accent.copy(alpha = 0.28f),
+                                    glow.copy(alpha = 0.16f)
+                                )
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = title,
+                        tint = if (isDark) glow else accent,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = title,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
-                    color = accent
+                    color = if (isDark) glow else accent,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             Text(
                 text = time,
                 style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
@@ -490,14 +634,35 @@ private fun MonthlySehriRow(
     schedule: DailyPrayerSchedule,
     isToday: Boolean,
     isSelected: Boolean,
+    isDark: Boolean,
     language: AppLanguage,
+    use24HourFormat: Boolean,
+    sehriBufferMinutes: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val bg = when {
-        isSelected -> WaqtGold.copy(alpha = 0.22f)
-        isToday -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.30f)
-        else -> MaterialTheme.colorScheme.surface.copy(alpha = 0.48f)
+        isSelected -> Brush.linearGradient(
+            listOf(
+                WaqtGold.copy(alpha = if (isDark) 0.24f else 0.26f),
+                WaqtTeal.copy(alpha = if (isDark) 0.14f else 0.12f)
+            )
+        )
+        isToday -> Brush.linearGradient(
+            listOf(
+                WaqtEmeraldLight.copy(alpha = if (isDark) 0.22f else 0.18f),
+                Color.White.copy(alpha = if (isDark) 0.08f else 0.50f)
+            )
+        )
+        else -> Brush.linearGradient(
+            listOf(
+                Color.White.copy(alpha = if (isDark) 0.08f else 0.50f),
+                Color.White.copy(alpha = if (isDark) 0.04f else 0.36f)
+            )
+        )
+    }
+    val sehriTime = remember(schedule, sehriBufferMinutes) {
+        schedule.sehriEnd.minusMinutes(sehriBufferMinutes.toLong())
     }
 
     Column(
@@ -520,22 +685,22 @@ private fun MonthlySehriRow(
                 modifier = Modifier.weight(1.2f)
             )
             Text(
-                text = BengaliFormatter.formatShortTime(schedule.sehriEnd, language),
+                text = BengaliFormatter.formatShortTime(sehriTime, language, use24HourFormat),
                 style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
                 fontWeight = FontWeight.SemiBold,
-                color = PrayerFajrAccent,
+                color = if (isDark) PrayerFajrGlow else PrayerFajrAccent,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.weight(1f)
             )
             Text(
-                text = BengaliFormatter.formatShortTime(schedule.iftarStart, language),
+                text = BengaliFormatter.formatShortTime(schedule.iftarStart, language, use24HourFormat),
                 style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
                 fontWeight = FontWeight.SemiBold,
-                color = PrayerMaghribAccent,
+                color = if (isDark) PrayerMaghribGlow else PrayerMaghribAccent,
                 textAlign = TextAlign.End,
                 modifier = Modifier.weight(1f)
             )
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.36f))
     }
 }

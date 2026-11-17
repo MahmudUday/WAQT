@@ -3,10 +3,13 @@ package com.example
 import android.app.AlarmManager
 import android.content.Context
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.BangladeshLocations
 import com.example.data.WaqtPreferencesRepository
@@ -49,6 +52,9 @@ class ExampleRobolectricTest {
         repo.setReminderOption(ReminderOption.MIN_40)
         repo.setWaqtEndAlertEnabled(false)
         repo.setTahajjudAlertEnabled(true)
+        repo.setUse24HourFormat(true)
+        repo.setHijriOffsetDays(1)
+        repo.setSehriBufferMinutes(5)
 
         val settings = repo.settingsFlow.first()
         assertEquals("comilla", settings.selectedDistrictId)
@@ -56,6 +62,9 @@ class ExampleRobolectricTest {
         assertEquals(ReminderOption.MIN_40, settings.reminderOption)
         assertFalse(settings.waqtEndAlertEnabled)
         assertTrue(settings.tahajjudAlertEnabled)
+        assertTrue(settings.use24HourFormat)
+        assertEquals(1, settings.hijriOffsetDays)
+        assertEquals(5, settings.sehriBufferMinutes)
     }
 
     @Test
@@ -91,7 +100,7 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun `glass bottom bar navigates smoothly across all tabs`() {
+    fun `glass bottom bar navigates smoothly across all tabs and settings controls work`() {
         composeRule.mainClock.advanceTimeBy(1800L)
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("nav_sehri_iftar").assertExists().performClick()
@@ -106,7 +115,37 @@ class ExampleRobolectricTest {
 
         composeRule.onNodeWithTag("nav_settings").assertExists().performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("settings_list").performScrollToNode(hasTestTag("theme_chip_dark"))
-        composeRule.onNodeWithTag("theme_chip_dark").assertExists()
+        composeRule.onNodeWithTag("settings_list").performScrollToNode(hasTestTag("time_format_24h"))
+        composeRule.onNodeWithTag("settings_list").performTouchInput {
+            swipeUp(startY = centerY, endY = centerY - 220f)
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("time_format_24h").assertExists().performClick()
+        composeRule.waitUntil(timeoutMillis = 3000L) {
+            composeRule.onAllNodes(hasTestTag("time_format_24h") and isSelected())
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+
+        composeRule.onNodeWithTag("settings_list").performScrollToNode(hasTestTag("sehri_buffer_3"))
+        composeRule.onNodeWithTag("settings_list").performTouchInput {
+            swipeUp(startY = centerY, endY = centerY - 200f)
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("hijri_offset_1").assertExists().performClick()
+        composeRule.waitUntil(timeoutMillis = 3000L) {
+            composeRule.onAllNodes(hasTestTag("hijri_offset_1") and isSelected())
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+
+        composeRule.onNodeWithTag("sehri_buffer_3").assertExists().performClick()
+        composeRule.waitUntil(timeoutMillis = 3000L) {
+            composeRule.onAllNodes(hasTestTag("sehri_buffer_3") and isSelected())
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+
+        composeRule.onNodeWithTag("settings_list").performScrollToNode(hasTestTag("about_us_card"))
+        composeRule.onNodeWithTag("about_us_card").assertExists()
+        composeRule.onNodeWithTag("settings_list").performScrollToNode(hasTestTag("share_app_button"))
+        composeRule.onNodeWithTag("share_app_button").assertExists()
     }
 }

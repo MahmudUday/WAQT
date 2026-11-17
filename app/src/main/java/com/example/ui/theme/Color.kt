@@ -25,29 +25,37 @@ val WaqtInkSecondary = Color(0xFF475569)
 val WaqtTextLight = Color(0xFFF5F3EC)
 val WaqtTextMutedDark = Color(0xFFB5C2D6)
 
-// Semantic Status Colors
+// Semantic & Colorful Glass Accent Colors
 val WaqtEmerald = Color(0xFF1B8A5A)
 val WaqtEmeraldLight = Color(0xFF43B984)
+val WaqtCyan = Color(0xFF38BDF8)
+val WaqtTeal = Color(0xFF2DD4BF)
+val WaqtViolet = Color(0xFF8B7CF6)
 val WaqtAmber = Color(0xFFD98218)
 val WaqtRose = Color(0xFFC94A5A)
 
-// Distinct Five Daily Prayer Card Accent Colors (Light & Dark friendly)
-val PrayerFajrAccent = Color(0xFF2E6DA4)       // Dawn Indigo-Blue
+// Distinct Five Daily Prayer Card Accent Colors (Vibrant Light & Dark glass friendly)
+val PrayerFajrAccent = Color(0xFF3898EC)       // Dawn Sky Blue
+val PrayerFajrGlow = Color(0xFF6DD5FA)
 val PrayerFajrTintLight = Color(0xFFEAF3FB)
 val PrayerFajrTintDark = Color(0xFF142D4C)
 
-val PrayerDhuhrAccent = Color(0xFFC48816)      // Midday Sunlit Gold-Amber
+val PrayerDhuhrAccent = Color(0xFFE5A11A)      // Midday Sunlit Gold-Amber
+val PrayerDhuhrGlow = Color(0xFFF6D365)
 val PrayerDhuhrTintLight = Color(0xFFFCF4E2)
 val PrayerDhuhrTintDark = Color(0xFF2F2816)
 
-val PrayerAsrAccent = Color(0xFFCE6532)        // Afternoon Warm Saffron-Terracotta
+val PrayerAsrAccent = Color(0xFFEC723B)        // Afternoon Warm Saffron-Coral
+val PrayerAsrGlow = Color(0xFFFFA07A)
 val PrayerAsrTintLight = Color(0xFFFDF0E9)
 val PrayerAsrTintDark = Color(0xFF342119)
 
-val PrayerMaghribAccent = Color(0xFF9D385C)    // Sunset Crimson-Plum
+val PrayerMaghribAccent = Color(0xFFD44278)    // Sunset Rose-Magenta
+val PrayerMaghribGlow = Color(0xFFA758D4)
 val PrayerMaghribTintLight = Color(0xFFFBECF1)
 val PrayerMaghribTintDark = Color(0xFF331B2A)
 
-val PrayerIshaAccent = Color(0xFF4B4FA1)       // Night Royal Indigo
+val PrayerIshaAccent = Color(0xFF6B70E6)       // Night Royal Indigo
+val PrayerIshaGlow = Color(0xFF9C8CFF)
 val PrayerIshaTintLight = Color(0xFFEEEEFA)
 val PrayerIshaTintDark = Color(0xFF1D2246)

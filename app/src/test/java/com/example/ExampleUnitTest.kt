@@ -13,6 +13,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.ZoneId
 
 class ExampleUnitTest {
@@ -128,6 +129,22 @@ class ExampleUnitTest {
         assertTrue(formattedDate.contains("২০২৬"))
         val hijri = HijriCalendarHelper.fromGregorian(date).format(AppLanguage.BENGALI)
         assertTrue(hijri.contains("হিজরি"))
+    }
+
+    @Test
+    fun `24 hour format and hijri lunar offset adjustment work accurately`() {
+        val afternoon = LocalTime.of(17, 25)
+        assertEquals("17:25", BengaliFormatter.formatTime(afternoon, AppLanguage.ENGLISH, use24Hour = true))
+        assertEquals("১৭:২৫", BengaliFormatter.formatTime(afternoon, AppLanguage.BENGALI, use24Hour = true))
+        assertEquals("+২", BengaliFormatter.formatSignedInt(2, AppLanguage.BENGALI))
+        assertEquals("-1", BengaliFormatter.formatSignedInt(-1, AppLanguage.ENGLISH))
+
+        val date = LocalDate.of(2026, 3, 15)
+        val baseHijri = HijriCalendarHelper.fromGregorian(date, offsetDays = 0)
+        val shiftedHijri = HijriCalendarHelper.fromGregorian(date, offsetDays = 1)
+        val nextDayBase = HijriCalendarHelper.fromGregorian(date.plusDays(1), offsetDays = 0)
+        assertEquals(nextDayBase, shiftedHijri)
+        assertTrue(baseHijri != shiftedHijri)
     }
 
     @Test

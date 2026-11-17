@@ -1,6 +1,7 @@
 package com.example.ui.strings
 
 import androidx.compose.runtime.Immutable
+import com.example.data.BengaliFormatter
 import com.example.model.AppLanguage
 import com.example.model.AsrJuristic
 import com.example.model.CalculationMethod
@@ -100,11 +101,25 @@ class WaqtStrings(val language: AppLanguage) {
 
     // Settings & About
     val settingsTitle: String get() = if (bn) "সেটিংস ও অ্যাপ তথ্য" else "Settings & About"
-    val appearanceSection: String get() = if (bn) "ভাষা, থিম ও মোশন" else "Language, Theme & Motion"
+    val appearanceSection: String get() = if (bn) "ভাষা, থিম ও ডিসপ্লে" else "Language, Theme & Display"
     val languageLabel: String get() = if (bn) "ভাষা" else "Language"
     val themeLabel: String get() = if (bn) "অ্যাপ থিম (লাইট / ডার্ক / সিস্টেম)" else "App Theme (Light / Dark / System)"
+    val timeFormatLabel: String get() = if (bn) "সময় প্রদর্শন ফরম্যাট" else "Clock Format"
+    val timeFormat12h: String get() = if (bn) "১২ ঘণ্টা (AM/PM)" else "12-Hour (AM/PM)"
+    val timeFormat24h: String get() = if (bn) "২৪ ঘণ্টা" else "24-Hour"
     val reduceMotionLabel: String get() = if (bn) "অ্যানিমেশন কমান (Reduce Motion)" else "Reduce Motion"
     val reduceMotionDesc: String get() = if (bn) "সহজ পাঠ ও ব্যাটারি সাশ্রয়ের জন্য" else "Minimal transitions for accessibility"
+    val calendarPreferencesSection: String get() = if (bn) "হিজরি ও সেহরি সমন্বয়" else "Hijri & Sehri Preferences"
+    val hijriAdjustLabel: String get() = if (bn) "হিজরি তারিখ সমন্বয় (চাঁদ দেখা)" else "Hijri Date Adjustment (Moon Sighting)"
+    val hijriAdjustDesc: String get() = if (bn) "চাঁদ দেখার ভিত্তিতে হিজরি তারিখ ±১ বা ±২ দিন ঠিক করুন" else "Shift Hijri lunar date by ±1 or ±2 days if needed"
+    val sehriBufferLabel: String get() = if (bn) "সেহরি সতর্কতামূলক সময় (ইহতিয়াত)" else "Sehri Caution Buffer"
+    val sehriBufferDesc: String get() = if (bn) "ফজরের আগে নিরাপদ সতর্কতা হিসেবে সেহরির শেষ সময় এগিয়ে আনুন" else "Set how many minutes before Fajr to stop Sehri"
+    val noBufferLabel: String get() = if (bn) "ফজর পর্যন্ত (০ মি.)" else "At Fajr (0m)"
+    fun bufferMinutesLabel(mins: Int): String = if (bn) "${BengaliFormatter.formatInt(mins, language)} মি. আগে" else "${mins}m before"
+    fun hijriOffsetLabel(offset: Int): String = when {
+        offset == 0 -> if (bn) "স্বাভাবিক (০)" else "Exact (0)"
+        else -> if (bn) "${BengaliFormatter.formatSignedInt(offset, language)} দিন" else "${BengaliFormatter.formatSignedInt(offset, language)}d"
+    }
     val calculationSection: String get() = if (bn) "হিসাব পদ্ধতি ও ফিকহ" else "Prayer Calculation & Fiqh"
     val methodLabel: String get() = if (bn) "হিসাব পদ্ধতি" else "Calculation Method"
     val asrRuleLabel: String get() = if (bn) "আসরের ওয়াক্ত নিয়ম" else "Asr Juristic Rule"
@@ -114,12 +129,22 @@ class WaqtStrings(val language: AppLanguage) {
         "Default for Bangladesh: University of Islamic Sciences, Karachi (18° Fajr / 18° Isha) with Hanafi Asr (2x shadow)."
     }
 
-    // About Us (Preserving approved brand & developer identity)
+    // Enhanced About Us (Preserving approved brand & developer identity)
     val aboutHeader: String get() = if (bn) "আমাদের সম্পর্কে" else "About Us"
     val aboutDescription: String get() = if (bn) {
-        "ওয়াক্ত (WAQT) বাংলাদেশের মুসলিমদের জন্য তৈরি একটি নির্ভুল, হালকা এবং অফলাইন-সমর্থিত ইসলামিক নামাজ, তাহাজ্জুদ ও সেহরি-ইফতার অ্যাপ।"
+        "ওয়াক্ত (WAQT) বাংলাদেশের মুসলিমদের জন্য তৈরি একটি নির্ভুল, হালকা, বিজ্ঞাপনমুক্ত এবং সম্পূর্ণ অফলাইন-সমর্থিত ইসলামিক নামাজ, তাহাজ্জুদ ও সেহরি-ইফতার সঙ্গী।"
     } else {
-        "WAQT is a lightweight, accurate, offline-first Islamic prayer, Tahajjud, Sehri & Iftar application crafted for Bangladeshi Muslims."
+        "WAQT is a lightweight, accurate, ad-free, 100% offline-first Islamic prayer, Tahajjud, Sehri & Iftar companion crafted for Bangladesh."
+    }
+    val aboutPrivacyBadge: String get() = if (bn) "১০০% অফলাইন • বিজ্ঞাপনমুক্ত • সম্পূর্ণ প্রাইভেট" else "100% Offline • Ad-Free • Zero Tracking"
+    val aboutFeatureOffline: String get() = if (bn) "৬৪ জেলা ও জিপিএস" else "64 Districts + GPS"
+    val aboutFeatureTahajjud: String get() = if (bn) "তাহাজ্জুদ ও সেহরি-ইফতার" else "Tahajjud & Sehri-Iftar"
+    val aboutFeatureSmartAlert: String get() = if (bn) "২০ মি. সমাপ্তি সতর্কতা" else "20m Ending Alerts"
+    val shareAppLabel: String get() = if (bn) "অ্যাপটি শেয়ার করুন" else "Share WAQT App"
+    val shareAppMessage: String get() = if (bn) {
+        "ওয়াক্ত (WAQT) — বাংলাদেশের ৬৪ জেলার নির্ভুল অফলাইন নামাজ, তাহাজ্জুদ ও সেহরি-ইফতার অ্যাপ: https://github.com/MahmudUday/namaz-app"
+    } else {
+        "WAQT — Accurate offline Prayer, Tahajjud & Sehri-Iftar times for Bangladesh: https://github.com/MahmudUday/namaz-app"
     }
     val developerLabel: String get() = if (bn) "ডেভেলপার" else "Developer"
     val developerName: String get() = "Mahmud Uday"

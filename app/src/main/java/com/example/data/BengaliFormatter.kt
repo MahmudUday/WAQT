@@ -27,6 +27,7 @@ object BengaliFormatter {
     )
 
     private val timeFormatter12En = DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH)
+    private val timeFormatter24En = DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH)
     private val dateFormatterEn = DateTimeFormatter.ofPattern("EEE, d MMM yyyy", Locale.ENGLISH)
     private val monthYearEn = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)
 
@@ -47,7 +48,20 @@ object BengaliFormatter {
         return if (language == AppLanguage.BENGALI) toBengaliDigits(str) else str
     }
 
-    fun formatTime(time: LocalTime, language: AppLanguage): String {
+    fun formatSignedInt(value: Int, language: AppLanguage): String {
+        val prefix = when {
+            value > 0 -> "+"
+            else -> ""
+        }
+        val raw = "$prefix$value"
+        return if (language == AppLanguage.BENGALI) toBengaliDigits(raw) else raw
+    }
+
+    fun formatTime(time: LocalTime, language: AppLanguage, use24Hour: Boolean = false): String {
+        if (use24Hour) {
+            val formatted24 = time.format(timeFormatter24En)
+            return if (language == AppLanguage.BENGALI) toBengaliDigits(formatted24) else formatted24
+        }
         if (language == AppLanguage.ENGLISH) {
             return time.format(timeFormatter12En)
         }
@@ -71,7 +85,11 @@ object BengaliFormatter {
         return "$periodBn ${toBengaliDigits("$hour12:$minutePadded")}"
     }
 
-    fun formatShortTime(time: LocalTime, language: AppLanguage): String {
+    fun formatShortTime(time: LocalTime, language: AppLanguage, use24Hour: Boolean = false): String {
+        if (use24Hour) {
+            val formatted24 = time.format(timeFormatter24En)
+            return if (language == AppLanguage.BENGALI) toBengaliDigits(formatted24) else formatted24
+        }
         val hour24 = time.hour
         val minute = time.minute
         val hour12 = when {

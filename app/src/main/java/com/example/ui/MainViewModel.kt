@@ -151,7 +151,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         } ?: false
         return LiveClockState(
             periodStatus = period,
-            sehriIftarCountdown = computeSehriIftarCountdown(now, todaySched, tomorrowSched),
+            sehriIftarCountdown = computeSehriIftarCountdown(
+                now = now,
+                today = todaySched,
+                tomorrow = tomorrowSched,
+                sehriBufferMinutes = state.settings.sehriBufferMinutes
+            ),
             isTahajjudActiveNow = tahajjudActive
         )
     }
@@ -211,7 +216,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         todaySchedule = todaySched,
                         tomorrowSchedule = tomorrowSched
                     )
-                    val sehriIftarCountdown = computeSehriIftarCountdown(now, todaySched, tomorrowSched)
+                    val sehriIftarCountdown = computeSehriIftarCountdown(
+                        now = now,
+                        today = todaySched,
+                        tomorrow = tomorrowSched,
+                        sehriBufferMinutes = state.settings.sehriBufferMinutes
+                    )
                     val tahajjudActive = state.tahajjudSchedule?.let {
                         !now.isBefore(it.startDateTime) && now.isBefore(it.endDateTime)
                     } ?: false
@@ -335,7 +345,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 settings = settings,
                 isOnline = isOnline,
                 todayDate = today,
-                hijriDate = HijriCalendarHelper.fromGregorian(today),
+                hijriDate = HijriCalendarHelper.fromGregorian(today, settings.hijriOffsetDays),
                 todaySchedule = todaySched,
                 tomorrowSchedule = tomorrowSched,
                 tahajjudSchedule = tahajjudSched,
@@ -351,7 +361,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val tahajjudActive = !now.isBefore(tahajjudSched.startDateTime) && now.isBefore(tahajjudSched.endDateTime)
         _liveClock.value = LiveClockState(
             periodStatus = periodStatus,
-            sehriIftarCountdown = computeSehriIftarCountdown(now, todaySched, tomorrowSched),
+            sehriIftarCountdown = computeSehriIftarCountdown(
+                now = now,
+                today = todaySched,
+                tomorrow = tomorrowSched,
+                sehriBufferMinutes = settings.sehriBufferMinutes
+            ),
             isTahajjudActiveNow = tahajjudActive
         )
 
@@ -400,12 +415,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun computeSehriIftarCountdown(
         now: LocalDateTime,
         today: DailyPrayerSchedule,
-        tomorrow: DailyPrayerSchedule
+        tomorrow: DailyPrayerSchedule,
+        sehriBufferMinutes: Int = 0
     ): SehriIftarTargetCountdown {
         val currentTime = now.toLocalTime()
+        val todaySehriCutoff = today.sehriEnd.minusMinutes(sehriBufferMinutes.toLong())
+        val tomorrowSehriCutoff = tomorrow.sehriEnd.minusMinutes(sehriBufferMinutes.toLong())
         return when {
-            currentTime.isBefore(today.sehriEnd) -> {
-                val target = LocalDateTime.of(today.date, today.sehriEnd)
+            currentTime.isBefore(todaySehriCutoff) -> {
+                val target = LocalDateTime.of(today.date, todaySehriCutoff)
                 SehriIftarTargetCountdown(
                     isSehriNext = true,
                     countdown = Duration.between(now, target).coerceAtLeast(Duration.ZERO)
@@ -419,7 +437,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
             else -> {
-                val target = LocalDateTime.of(tomorrow.date, tomorrow.sehriEnd)
+                val target = LocalDateTime.of(tomorrow.date, tomorrowSehriCutoff)
                 SehriIftarTargetCountdown(
                     isSehriNext = true,
                     countdown = Duration.between(now, target).coerceAtLeast(Duration.ZERO)
@@ -574,6 +592,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setReduceMotion(reduce: Boolean) {
         viewModelScope.launch { repository.setReduceMotion(reduce) }
+    }
+
+    fun setUse24HourFormat(use24Hour: Boolean) {
+        viewModelScope.launch { repository.setUse24HourFormat(use24Hour) }
+    }
+
+    fun setHijriOffsetDays(offsetDays: Int) {
+        viewModelScope.launch { repository.setHijriOffsetDays(offsetDays) }
+    }
+
+    fun setSehriBufferMinutes(minutes: Int) {
+        viewModelScope.launch { repository.setSehriBufferMinutes(minutes) }
     }
 
     fun setCalculationMethod(method: CalculationMethod) {

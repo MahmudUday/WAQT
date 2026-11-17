@@ -40,10 +40,11 @@ data class HijriDate(
 
 object HijriCalendarHelper {
 
-    fun fromGregorian(date: LocalDate): HijriDate {
-        val day = date.dayOfMonth
-        val month = date.monthValue
-        val year = date.year
+    fun fromGregorian(date: LocalDate, offsetDays: Int = 0): HijriDate {
+        val adjusted = if (offsetDays == 0) date else date.plusDays(offsetDays.toLong())
+        val day = adjusted.dayOfMonth
+        val month = adjusted.monthValue
+        val year = adjusted.year
 
         var m = month
         var y = year
