@@ -60,6 +60,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -70,7 +71,6 @@ import com.example.model.ReminderOption
 import com.example.ui.WaqtUiState
 import com.example.ui.components.WaqtGlassCard
 import com.example.ui.components.waqtPressScale
-import com.example.ui.components.waqtScrollReveal
 import com.example.ui.strings.WaqtStrings
 import com.example.ui.theme.WaqtAmber
 import com.example.ui.theme.WaqtEmerald
@@ -88,7 +88,8 @@ fun AlarmsScreen(
     onSelectReminder: (ReminderOption) -> Unit,
     onSelectTone: (NotificationTone) -> Unit,
     onSendTestNotification: () -> Unit,
-    onRefreshPermissions: () -> Unit
+    onRefreshPermissions: () -> Unit,
+    bottomBarPadding: Dp = 0.dp
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -119,14 +120,18 @@ fun AlarmsScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .widthIn(max = 720.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+                .widthIn(max = 720.dp)
+                .testTag("alarms_list"),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                top = 14.dp,
+                end = 16.dp,
+                bottom = 18.dp + bottomBarPadding
+            ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item(key = "header", contentType = "header") {
-                Column(
-                    modifier = Modifier.waqtScrollReveal(reduceMotion)
-                ) {
+                Column {
                     Text(
                         text = strings.alarmsTitle,
                         style = MaterialTheme.typography.titleLarge,
@@ -151,7 +156,6 @@ fun AlarmsScreen(
                         icon = Icons.Rounded.NotificationsActive,
                         reduceMotion = reduceMotion,
                         testTag = "grant_notification_permission_button",
-                        modifier = Modifier.waqtScrollReveal(reduceMotion),
                         onAction = {
                             notificationPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                         }
@@ -169,7 +173,6 @@ fun AlarmsScreen(
                         icon = Icons.Rounded.Schedule,
                         reduceMotion = reduceMotion,
                         testTag = "grant_exact_alarm_button",
-                        modifier = Modifier.waqtScrollReveal(reduceMotion),
                         onAction = {
                             runCatching {
                                 val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
@@ -192,7 +195,6 @@ fun AlarmsScreen(
                         icon = Icons.Rounded.BatteryAlert,
                         reduceMotion = reduceMotion,
                         testTag = "battery_optimization_button",
-                        modifier = Modifier.waqtScrollReveal(reduceMotion),
                         onAction = {
                             runCatching {
                                 val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
@@ -209,9 +211,7 @@ fun AlarmsScreen(
                     color = WaqtEmerald.copy(alpha = 0.14f),
                     shape = RoundedCornerShape(16.dp),
                     border = BorderStroke(1.dp, WaqtEmerald.copy(alpha = 0.30f)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .waqtScrollReveal(reduceMotion)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
                         modifier = Modifier.padding(14.dp),
@@ -236,9 +236,7 @@ fun AlarmsScreen(
             // 20-Min Before Waqt Ends + Tahajjud Smart Alerts Card
             item(key = "smart_alerts_card", contentType = "card") {
                 WaqtGlassCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .waqtScrollReveal(reduceMotion)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(
@@ -317,9 +315,7 @@ fun AlarmsScreen(
             // Individual 5 Prayer Toggles
             item(key = "prayer_toggles", contentType = "card") {
                 WaqtGlassCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .waqtScrollReveal(reduceMotion)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
@@ -366,9 +362,7 @@ fun AlarmsScreen(
             // Pre-Prayer Start Reminder Selector (Off, 5, 20, 40 min)
             item(key = "reminder_options", contentType = "card") {
                 WaqtGlassCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .waqtScrollReveal(reduceMotion)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
@@ -402,9 +396,7 @@ fun AlarmsScreen(
             // Alarm & Notification Tone Selector
             item(key = "tone_selector", contentType = "card") {
                 WaqtGlassCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .waqtScrollReveal(reduceMotion)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
@@ -453,7 +445,6 @@ fun AlarmsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 48.dp)
-                        .waqtScrollReveal(reduceMotion)
                         .waqtPressScale(testBtnInteraction, reduceMotion)
                         .testTag("send_test_notification_button"),
                     shape = RoundedCornerShape(14.dp)
@@ -468,7 +459,6 @@ fun AlarmsScreen(
                         text = if (testSentFeedback) strings.testNotificationSent else strings.testNotificationButton
                     )
                 }
-                Spacer(modifier = Modifier.height(14.dp))
             }
         }
     }

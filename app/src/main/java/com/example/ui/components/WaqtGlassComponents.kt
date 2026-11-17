@@ -1,11 +1,8 @@
 package com.example.ui.components
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -19,46 +16,47 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.model.ThemeMode
 import com.example.ui.theme.WaqtCreamBg
 import com.example.ui.theme.WaqtGold
+import com.example.ui.theme.WaqtGoldBright
 import com.example.ui.theme.WaqtNavy
 import com.example.ui.theme.WaqtNavyDeep
 
 /**
  * Lightweight GPU-only press-scale animation backed by Compose's existing InteractionSource.
- * Reads animation state strictly in the graphicsLayer phase (zero button recomposition on press).
+ * Implemented directly as a @Composable Modifier (zero Modifier.composed overhead) and reads
+ * animation state strictly in the graphicsLayer phase.
  */
+@Composable
 fun Modifier.waqtPressScale(
     interactionSource: MutableInteractionSource,
     reduceMotion: Boolean = false
-): Modifier = composed {
-    if (reduceMotion) return@composed this
+): Modifier {
+    if (reduceMotion) return this
     val isPressed by interactionSource.collectIsPressedAsState()
     val scaleState = animateFloatAsState(
         targetValue = if (isPressed) 0.965f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMedium
+            stiffness = Spring.StiffnessMediumLow
         ),
         label = "waqt_press_scale"
     )
-    this.graphicsLayer {
+    return this.graphicsLayer {
         val s = scaleState.value
         scaleX = s
         scaleY = s
@@ -66,29 +64,8 @@ fun Modifier.waqtPressScale(
 }
 
 /**
- * Ultra-light 120Hz/144Hz GPU-only scroll reveal animation.
- * Uses pure RenderNode translationY (no alpha saveLayer FBOs, no text resampling scale,
- * and zero per-frame layoutInfo snapshot reads during scroll).
- */
-fun Modifier.waqtScrollReveal(
-    reduceMotion: Boolean = false
-): Modifier = composed {
-    if (reduceMotion) return@composed this
-    val glideOffsetPx = with(LocalDensity.current) { 14.dp.toPx() }
-    val progress = remember { Animatable(1f) }
-    LaunchedEffect(Unit) {
-        progress.animateTo(
-            targetValue = 0f,
-            animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing)
-        )
-    }
-    this.graphicsLayer {
-        translationY = glideOffsetPx * progress.value
-    }
-}
-
-/**
- * Ambient luminous backdrop with single-pass cached gradients (minimal pixel overdraw, zero blur).
+ * Ambient luminous backdrop with single-pass cached gradients (minimal pixel overdraw, zero blur)
+ * designed so translucent glass cards and glass bottom navigation bar reflect rich depth underneath.
  */
 @Composable
 fun WaqtAmbientBackground(
@@ -104,16 +81,19 @@ fun WaqtAmbientBackground(
     val baseBrush = remember(isDark) {
         if (isDark) {
             Brush.verticalGradient(
-                colors = listOf(WaqtNavyDeep, WaqtNavy, Color(0xFF091830))
+                colors = listOf(Color(0xFF061124), WaqtNavy, Color(0xFF07162E))
             )
         } else {
             Brush.verticalGradient(
-                colors = listOf(Color(0xFFFDFBF5), WaqtCreamBg, Color(0xFFEEE6D5))
+                colors = listOf(Color(0xFFFDFBF5), WaqtCreamBg, Color(0xFFE7DEC9))
             )
         }
     }
 
-    val goldGlowColor = remember(isDark) { WaqtGold.copy(alpha = if (isDark) 0.16f else 0.15f) }
+    val goldGlowColor = remember(isDark) { WaqtGold.copy(alpha = if (isDark) 0.18f else 0.16f) }
+    val bottomGlowColor = remember(isDark) {
+        if (isDark) Color(0xFF195E59).copy(alpha = 0.22f) else WaqtGold.copy(alpha = 0.10f)
+    }
 
     Box(
         modifier = Modifier
@@ -123,14 +103,22 @@ fun WaqtAmbientBackground(
                 val w = size.width
                 val h = size.height
                 val goldCenter = Offset(w * 0.85f, h * 0.12f)
-                val goldRadius = (w * 0.62f).coerceAtLeast(1f)
+                val goldRadius = (w * 0.64f).coerceAtLeast(1f)
                 val goldBrush = Brush.radialGradient(
                     colors = listOf(goldGlowColor, Color.Transparent),
                     center = goldCenter,
                     radius = goldRadius
                 )
+                val lowerCenter = Offset(w * 0.18f, h * 0.88f)
+                val lowerRadius = (w * 0.68f).coerceAtLeast(1f)
+                val lowerBrush = Brush.radialGradient(
+                    colors = listOf(bottomGlowColor, Color.Transparent),
+                    center = lowerCenter,
+                    radius = lowerRadius
+                )
                 onDrawBehind {
                     drawCircle(brush = goldBrush, radius = goldRadius, center = goldCenter)
+                    drawCircle(brush = lowerBrush, radius = lowerRadius, center = lowerCenter)
                 }
             }
     ) {
@@ -139,7 +127,7 @@ fun WaqtAmbientBackground(
 }
 
 /**
- * Translucent glassmorphic card with specular luminous border and zero runtime blur overhead.
+ * Translucent glassmorphic card with specular top-to-bottom luminous border and zero runtime blur overhead.
  */
 @Composable
 fun WaqtGlassCard(
@@ -152,22 +140,59 @@ fun WaqtGlassCard(
 ) {
     val isDark = MaterialTheme.colorScheme.background == WaqtNavyDeep
     val glassBg = tintColor ?: if (isDark) {
-        Color(0xFF132A4E).copy(alpha = 0.66f)
+        Color(0xFF132B52).copy(alpha = 0.54f)
     } else {
-        Color.White.copy(alpha = 0.74f)
+        Color.White.copy(alpha = 0.62f)
     }
-    val edgeColor = borderColor ?: if (isDark) {
-        WaqtGold.copy(alpha = 0.28f)
+    val borderStroke = if (borderColor != null) {
+        BorderStroke(borderWidth, borderColor)
     } else {
-        Color.White.copy(alpha = 0.92f)
+        val topEdge = if (isDark) Color.White.copy(alpha = 0.26f) else Color.White.copy(alpha = 0.94f)
+        val bottomEdge = if (isDark) WaqtGold.copy(alpha = 0.14f) else WaqtGold.copy(alpha = 0.24f)
+        BorderStroke(
+            width = borderWidth,
+            brush = Brush.verticalGradient(listOf(topEdge, bottomEdge))
+        )
     }
 
     Card(
         modifier = modifier,
         shape = shape,
         colors = CardDefaults.cardColors(containerColor = glassBg),
-        border = BorderStroke(borderWidth, edgeColor),
+        border = borderStroke,
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        content = content
+    )
+}
+
+/**
+ * Translucent frosted-glass surface for floating bottom navigation bar and navigation rail (zero blur).
+ */
+@Composable
+fun WaqtGlassBarSurface(
+    modifier: Modifier = Modifier,
+    shape: Shape = RoundedCornerShape(26.dp),
+    content: @Composable () -> Unit
+) {
+    val isDark = MaterialTheme.colorScheme.background == WaqtNavyDeep
+    val glassBg = if (isDark) {
+        Color(0xFF0C1E3A).copy(alpha = 0.64f)
+    } else {
+        Color.White.copy(alpha = 0.70f)
+    }
+    val topEdge = if (isDark) WaqtGoldBright.copy(alpha = 0.34f) else Color.White.copy(alpha = 0.96f)
+    val bottomEdge = if (isDark) Color.White.copy(alpha = 0.12f) else WaqtGold.copy(alpha = 0.28f)
+    val borderBrush = remember(isDark) {
+        Brush.verticalGradient(listOf(topEdge, bottomEdge))
+    }
+
+    Surface(
+        modifier = modifier,
+        shape = shape,
+        color = glassBg,
+        border = BorderStroke(1.1.dp, borderBrush),
+        shadowElevation = 0.dp,
+        tonalElevation = 0.dp,
         content = content
     )
 }

@@ -49,6 +49,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.BengaliFormatter
@@ -59,7 +60,6 @@ import com.example.ui.LiveClockState
 import com.example.ui.WaqtUiState
 import com.example.ui.components.WaqtGlassCard
 import com.example.ui.components.waqtPressScale
-import com.example.ui.components.waqtScrollReveal
 import com.example.ui.strings.WaqtStrings
 import com.example.ui.theme.PrayerFajrAccent
 import com.example.ui.theme.PrayerMaghribAccent
@@ -77,7 +77,8 @@ fun SehriIftarScreen(
     strings: WaqtStrings,
     onSelectDate: (LocalDate) -> Unit,
     onSelectMonth: (YearMonth) -> Unit,
-    onOpenLocationPicker: () -> Unit
+    onOpenLocationPicker: () -> Unit,
+    bottomBarPadding: Dp = 0.dp
 ) {
     val lang = uiState.settings.language
     val reduceMotion = uiState.settings.reduceMotion
@@ -105,15 +106,19 @@ fun SehriIftarScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .widthIn(max = 720.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+                .widthIn(max = 720.dp)
+                .testTag("sehri_list"),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                top = 14.dp,
+                end = 16.dp,
+                bottom = 18.dp + bottomBarPadding
+            ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item(key = "header", contentType = "header") {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .waqtScrollReveal(reduceMotion),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -131,7 +136,7 @@ fun SehriIftarScreen(
                     }
                     Surface(
                         shape = RoundedCornerShape(50),
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.68f),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.56f),
                         border = BorderStroke(1.dp, WaqtGold.copy(alpha = 0.45f)),
                         modifier = Modifier
                             .waqtPressScale(locationInteraction, reduceMotion)
@@ -167,16 +172,13 @@ fun SehriIftarScreen(
                 SehriCountdownBanner(
                     liveClockFlow = liveClockFlow,
                     language = lang,
-                    strings = strings,
-                    modifier = Modifier.waqtScrollReveal(reduceMotion)
+                    strings = strings
                 )
             }
 
             item(key = "date_nav", contentType = "date_nav") {
                 WaqtGlassCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .waqtScrollReveal(reduceMotion)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
                         modifier = Modifier
@@ -250,9 +252,7 @@ fun SehriIftarScreen(
             if (selectedSchedule != null) {
                 item(key = "sehri_iftar_cards", contentType = "boundary_cards") {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .waqtScrollReveal(reduceMotion),
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         FastingBoundaryCard(
@@ -333,7 +333,7 @@ fun SehriIftarScreen(
 
             item(key = "table_columns", contentType = "table_header") {
                 Surface(
-                    color = WaqtNavy.copy(alpha = 0.80f),
+                    color = WaqtNavy.copy(alpha = 0.70f),
                     shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
                     border = BorderStroke(1.dp, WaqtGold.copy(alpha = 0.30f)),
                     modifier = Modifier.fillMaxWidth()
@@ -381,10 +381,6 @@ fun SehriIftarScreen(
                     onClick = { onSelectDate(daySchedule.date) }
                 )
             }
-
-            item(key = "bottom_space", contentType = "spacer") {
-                Spacer(modifier = Modifier.height(14.dp))
-            }
         }
     }
 }
@@ -404,7 +400,7 @@ private fun SehriCountdownBanner(
 
     Card(
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = WaqtNavy.copy(alpha = 0.78f)),
+        colors = CardDefaults.cardColors(containerColor = WaqtNavy.copy(alpha = 0.68f)),
         border = BorderStroke(1.dp, WaqtGold.copy(alpha = 0.50f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = modifier.fillMaxWidth()
@@ -500,8 +496,8 @@ private fun MonthlySehriRow(
 ) {
     val bg = when {
         isSelected -> WaqtGold.copy(alpha = 0.22f)
-        isToday -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.32f)
-        else -> MaterialTheme.colorScheme.surface.copy(alpha = 0.56f)
+        isToday -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.30f)
+        else -> MaterialTheme.colorScheme.surface.copy(alpha = 0.48f)
     }
 
     Column(

@@ -54,6 +54,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.BuildConfig
 import com.example.model.AppLanguage
@@ -63,7 +64,6 @@ import com.example.model.ThemeMode
 import com.example.ui.WaqtUiState
 import com.example.ui.components.WaqtGlassCard
 import com.example.ui.components.waqtPressScale
-import com.example.ui.components.waqtScrollReveal
 import com.example.ui.strings.WaqtStrings
 import com.example.ui.theme.WaqtGold
 import com.example.ui.theme.WaqtGoldSoft
@@ -79,7 +79,8 @@ fun SettingsScreen(
     onToggleReduceMotion: (Boolean) -> Unit,
     onOpenLocationPicker: () -> Unit,
     onSelectMethod: (CalculationMethod) -> Unit,
-    onSelectAsrJuristic: (AsrJuristic) -> Unit
+    onSelectAsrJuristic: (AsrJuristic) -> Unit,
+    bottomBarPadding: Dp = 0.dp
 ) {
     val context = LocalContext.current
     val settings = uiState.settings
@@ -98,16 +99,21 @@ fun SettingsScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .widthIn(max = 720.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+                .widthIn(max = 720.dp)
+                .testTag("settings_list"),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                top = 14.dp,
+                end = 16.dp,
+                bottom = 18.dp + bottomBarPadding
+            ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item(key = "header", contentType = "header") {
                 Text(
                     text = strings.settingsTitle,
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.waqtScrollReveal(reduceMotion)
+                    fontWeight = FontWeight.Bold
                 )
             }
 
@@ -115,7 +121,6 @@ fun SettingsScreen(
                 WaqtGlassCard(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .waqtScrollReveal(reduceMotion)
                         .waqtPressScale(locationCardInteraction, reduceMotion)
                         .clip(RoundedCornerShape(20.dp))
                         .clickable(
@@ -156,9 +161,7 @@ fun SettingsScreen(
             // Language, Theme (Dark/Light/System) & Reduce Motion
             item(key = "appearance_card", contentType = "card") {
                 WaqtGlassCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .waqtScrollReveal(reduceMotion)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
@@ -268,9 +271,7 @@ fun SettingsScreen(
             // Calculation Method & Asr Juristic Rule
             item(key = "calculation_card", contentType = "card") {
                 WaqtGlassCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .waqtScrollReveal(reduceMotion)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
@@ -355,12 +356,11 @@ fun SettingsScreen(
             item(key = "about_card", contentType = "card") {
                 Card(
                     shape = RoundedCornerShape(22.dp),
-                    colors = CardDefaults.cardColors(containerColor = WaqtNavy.copy(alpha = 0.78f)),
+                    colors = CardDefaults.cardColors(containerColor = WaqtNavy.copy(alpha = 0.68f)),
                     border = BorderStroke(1.dp, WaqtGold.copy(alpha = 0.45f)),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .waqtScrollReveal(reduceMotion)
                         .testTag("about_us_card")
                 ) {
                     Column(modifier = Modifier.padding(18.dp)) {
@@ -434,7 +434,6 @@ fun SettingsScreen(
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(14.dp))
             }
         }
     }

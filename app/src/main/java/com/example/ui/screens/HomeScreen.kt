@@ -1,13 +1,12 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -18,7 +17,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -59,7 +57,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -68,6 +68,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -81,7 +82,6 @@ import com.example.ui.LiveClockState
 import com.example.ui.WaqtUiState
 import com.example.ui.components.WaqtGlassCard
 import com.example.ui.components.waqtPressScale
-import com.example.ui.components.waqtScrollReveal
 import com.example.ui.strings.WaqtStrings
 import com.example.ui.theme.PrayerAsrAccent
 import com.example.ui.theme.PrayerAsrTintDark
@@ -130,7 +130,8 @@ fun HomeScreen(
     strings: WaqtStrings,
     onOpenLocationPicker: () -> Unit,
     onTogglePrayerAlert: (PrayerType, Boolean) -> Unit,
-    onToggleTahajjudAlert: (Boolean) -> Unit
+    onToggleTahajjudAlert: (Boolean) -> Unit,
+    bottomBarPadding: Dp = 0.dp
 ) {
     val initialClock = remember(liveClockFlow) { liveClockFlow.value }
     val periodSummary by remember(liveClockFlow) {
@@ -175,7 +176,12 @@ fun HomeScreen(
                 .fillMaxSize()
                 .widthIn(max = 720.dp)
                 .testTag("home_prayer_list"),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                top = 12.dp,
+                end = 16.dp,
+                bottom = 18.dp + bottomBarPadding
+            ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // Glassmorphic Brand & Location Bar
@@ -186,10 +192,7 @@ fun HomeScreen(
                     language = settings.language,
                     strings = strings,
                     reduceMotion = settings.reduceMotion,
-                    onOpenLocationPicker = onOpenLocationPicker,
-                    modifier = Modifier
-                        .animateItem()
-                        .waqtScrollReveal(settings.reduceMotion)
+                    onOpenLocationPicker = onOpenLocationPicker
                 )
             }
 
@@ -199,8 +202,7 @@ fun HomeScreen(
                     isOnline = uiState.isOnline,
                     isFromCache = uiState.isUsingCachedFallback,
                     isRamadan = uiState.hijriDate.isRamadan,
-                    strings = strings,
-                    modifier = Modifier.animateItem()
+                    strings = strings
                 )
             }
 
@@ -214,15 +216,11 @@ fun HomeScreen(
                         liveClockFlow = liveClockFlow,
                         dateLabel = dateLabel,
                         hijriLabel = hijriLabel,
-                        reduceMotion = settings.reduceMotion,
-                        strings = strings,
-                        modifier = Modifier
-                            .animateItem()
-                            .waqtScrollReveal(settings.reduceMotion)
+                        strings = strings
                     )
                 }
 
-                // Five Distinct Color Glass Prayer Cards (no per-second recomposition!)
+                // Five Distinct Color Glass Prayer Cards (zero per-second recomposition!)
                 items(
                     items = PrayerType.entries,
                     key = { it.name },
@@ -246,10 +244,7 @@ fun HomeScreen(
                         isAlertEnabled = isAlertEnabled,
                         reduceMotion = settings.reduceMotion,
                         strings = strings,
-                        onToggleAlert = { onTogglePrayerAlert(prayer, !isAlertEnabled) },
-                        modifier = Modifier
-                            .animateItem()
-                            .waqtScrollReveal(settings.reduceMotion)
+                        onToggleAlert = { onTogglePrayerAlert(prayer, !isAlertEnabled) }
                     )
                 }
             }
@@ -264,16 +259,9 @@ fun HomeScreen(
                         language = settings.language,
                         reduceMotion = settings.reduceMotion,
                         strings = strings,
-                        onToggleAlarm = { onToggleTahajjudAlert(!settings.tahajjudAlertEnabled) },
-                        modifier = Modifier
-                            .animateItem()
-                            .waqtScrollReveal(settings.reduceMotion)
+                        onToggleAlarm = { onToggleTahajjudAlert(!settings.tahajjudAlertEnabled) }
                     )
                 }
-            }
-
-            item(key = "bottom_spacer", contentType = "spacer") {
-                Spacer(modifier = Modifier.height(14.dp))
             }
         }
     }
@@ -463,14 +451,13 @@ private fun HeroCountdownCard(
     liveClockFlow: StateFlow<LiveClockState>,
     dateLabel: String,
     hijriLabel: String,
-    reduceMotion: Boolean,
     strings: WaqtStrings,
     modifier: Modifier = Modifier
 ) {
     val borderBrush = remember {
         Brush.verticalGradient(
             listOf(
-                WaqtGoldBright.copy(alpha = 0.72f),
+                WaqtGoldBright.copy(alpha = 0.68f),
                 WaqtGold.copy(alpha = 0.22f)
             )
         )
@@ -478,9 +465,9 @@ private fun HeroCountdownCard(
     val heroFillBrush = remember {
         Brush.linearGradient(
             colors = listOf(
-                WaqtNavyDeep.copy(alpha = 0.80f),
-                WaqtNavy.copy(alpha = 0.74f),
-                WaqtNavyCard.copy(alpha = 0.70f)
+                WaqtNavyDeep.copy(alpha = 0.70f),
+                WaqtNavy.copy(alpha = 0.62f),
+                WaqtNavyCard.copy(alpha = 0.56f)
             )
         )
     }
@@ -656,11 +643,8 @@ private fun HeroCountdownCard(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Sleek Horizontal Glass Waqt Progress Bar (replaces bulky side circle so countdown stays 1-line)
-                HeroLiveProgressBar(
-                    liveClockFlow = liveClockFlow,
-                    reduceMotion = reduceMotion
-                )
+                // Sleek GPU-only Horizontal Glass Waqt Progress Bar (zero layout invalidation per second)
+                HeroLiveProgressBar(liveClockFlow = liveClockFlow)
 
                 Spacer(modifier = Modifier.height(12.dp))
 
@@ -746,37 +730,29 @@ private fun HeroLiveCountdownValue(
 
 @Composable
 private fun HeroLiveProgressBar(
-    liveClockFlow: StateFlow<LiveClockState>,
-    reduceMotion: Boolean
+    liveClockFlow: StateFlow<LiveClockState>
 ) {
     val liveClock by liveClockFlow.collectAsStateWithLifecycle()
-    val targetFraction = (liveClock.periodStatus?.elapsedFraction ?: 0f).coerceIn(0f, 1f)
-    val animatedProgress by animateFloatAsState(
-        targetValue = targetFraction,
-        animationSpec = tween(
-            durationMillis = if (reduceMotion) 0 else 450,
-            easing = FastOutSlowInEasing
-        ),
-        label = "waqt_linear_progress"
-    )
+    val fraction = (liveClock.periodStatus?.elapsedFraction ?: 0f).coerceIn(0.03f, 1f)
+    val trackColor = remember { Color.White.copy(alpha = 0.14f) }
+    val fillBrush = remember {
+        Brush.horizontalGradient(listOf(WaqtGold, WaqtGoldBright))
+    }
 
-    Box(
+    Canvas(
         modifier = Modifier
             .fillMaxWidth()
-            .height(5.dp)
-            .clip(RoundedCornerShape(50))
-            .background(Color.White.copy(alpha = 0.14f))
+            .height(6.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(animatedProgress.coerceAtLeast(0.03f))
-                .fillMaxHeight()
-                .clip(RoundedCornerShape(50))
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(WaqtGold, WaqtGoldBright)
-                    )
-                )
+        val corner = CornerRadius(size.height / 2f, size.height / 2f)
+        drawRoundRect(
+            color = trackColor,
+            cornerRadius = corner
+        )
+        drawRoundRect(
+            brush = fillBrush,
+            size = Size(width = size.width * fraction, height = size.height),
+            cornerRadius = corner
         )
     }
 }
@@ -800,7 +776,7 @@ private fun PrayerColorCard(
         isNext -> WaqtGold
         else -> palette.accent.copy(alpha = 0.34f)
     }
-    val cardContainerColor = palette.container.copy(alpha = if (isDark) 0.62f else 0.72f)
+    val cardContainerColor = palette.container.copy(alpha = if (isDark) 0.52f else 0.64f)
     val bellInteraction = remember { MutableInteractionSource() }
 
     Card(
@@ -809,7 +785,7 @@ private fun PrayerColorCard(
             .testTag("prayer_card_${prayer.name.lowercase()}"),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = cardContainerColor),
-        border = BorderStroke(if (isCurrent || isNext) 1.8.dp else 1.dp, borderColor),
+        border = BorderStroke(if (isCurrent || isNext) 1.6.dp else 1.dp, borderColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
@@ -927,8 +903,8 @@ private fun TahajjudGlassCard(
     val cardBrush = remember {
         Brush.linearGradient(
             listOf(
-                Color(0xFF141D3D).copy(alpha = 0.78f),
-                Color(0xFF232C5C).copy(alpha = 0.72f)
+                Color(0xFF141D3D).copy(alpha = 0.66f),
+                Color(0xFF232C5C).copy(alpha = 0.58f)
             )
         )
     }

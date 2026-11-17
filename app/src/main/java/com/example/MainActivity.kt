@@ -14,12 +14,21 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.NightsStay
@@ -47,7 +56,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -61,6 +72,7 @@ import com.example.ui.MainViewModel
 import com.example.ui.components.AnimatedIntroOverlay
 import com.example.ui.components.LocationPickerSheet
 import com.example.ui.components.WaqtAmbientBackground
+import com.example.ui.components.WaqtGlassBarSurface
 import com.example.ui.components.waqtPressScale
 import com.example.ui.screens.AlarmsScreen
 import com.example.ui.screens.HomeScreen
@@ -161,75 +173,120 @@ fun WaqtApp(viewModel: MainViewModel) {
         WaqtAmbientBackground(themeMode = uiState.settings.themeMode) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val useNavRail = maxWidth >= 680.dp
+                val layoutDirection = LocalLayoutDirection.current
 
                 Scaffold(
                     contentWindowInsets = WindowInsets.safeDrawing,
                     containerColor = Color.Transparent,
                     bottomBar = {
                         if (!useNavRail) {
-                            NavigationBar(
-                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.76f)
-                            ) {
-                                WaqtDestination.entries.forEach { dest ->
-                                    val selected = currentRoute == dest.route
-                                    val label = dest.label(strings)
-                                    val itemInteraction = remember { MutableInteractionSource() }
-                                    NavigationBarItem(
-                                        selected = selected,
-                                        onClick = { navigateTo(dest.route) },
-                                        interactionSource = itemInteraction,
-                                        icon = {
-                                            Icon(
-                                                imageVector = if (selected) dest.selectedIcon else dest.unselectedIcon,
-                                                contentDescription = label
-                                            )
-                                        },
-                                        label = { Text(label, maxLines = 1) },
-                                        colors = NavigationBarItemDefaults.colors(
-                                            selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                            selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                                            indicatorColor = WaqtGold.copy(alpha = 0.28f)
-                                        ),
-                                        modifier = Modifier
-                                            .waqtPressScale(itemInteraction, reduceMotion)
-                                            .testTag("nav_${dest.route}")
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .windowInsetsPadding(
+                                        WindowInsets.navigationBars.only(
+                                            WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal
+                                        )
                                     )
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                            ) {
+                                WaqtGlassBarSurface(
+                                    shape = RoundedCornerShape(26.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    NavigationBar(
+                                        containerColor = Color.Transparent,
+                                        tonalElevation = 0.dp,
+                                        windowInsets = WindowInsets(0, 0, 0, 0)
+                                    ) {
+                                        WaqtDestination.entries.forEach { dest ->
+                                            val selected = currentRoute == dest.route
+                                            val label = dest.label(strings)
+                                            val itemInteraction = remember { MutableInteractionSource() }
+                                            NavigationBarItem(
+                                                selected = selected,
+                                                onClick = { navigateTo(dest.route) },
+                                                interactionSource = itemInteraction,
+                                                icon = {
+                                                    Icon(
+                                                        imageVector = if (selected) dest.selectedIcon else dest.unselectedIcon,
+                                                        contentDescription = label
+                                                    )
+                                                },
+                                                label = {
+                                                    Text(
+                                                        text = label,
+                                                        maxLines = 1,
+                                                        softWrap = false,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                },
+                                                colors = NavigationBarItemDefaults.colors(
+                                                    selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                                    selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    indicatorColor = WaqtGold.copy(alpha = 0.24f)
+                                                ),
+                                                modifier = Modifier
+                                                    .waqtPressScale(itemInteraction, reduceMotion)
+                                                    .testTag("nav_${dest.route}")
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 ) { innerPadding ->
+                    val bottomBarPadding = if (useNavRail) 0.dp else innerPadding.calculateBottomPadding()
                     Row(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(innerPadding)
+                            .padding(
+                                start = innerPadding.calculateStartPadding(layoutDirection),
+                                top = innerPadding.calculateTopPadding(),
+                                end = innerPadding.calculateEndPadding(layoutDirection)
+                            )
                     ) {
                         if (useNavRail) {
-                            NavigationRail(
-                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.76f)
+                            WaqtGlassBarSurface(
+                                shape = RoundedCornerShape(24.dp),
+                                modifier = Modifier.padding(start = 10.dp, top = 8.dp, bottom = 10.dp)
                             ) {
-                                WaqtDestination.entries.forEach { dest ->
-                                    val selected = currentRoute == dest.route
-                                    val label = dest.label(strings)
-                                    val railInteraction = remember { MutableInteractionSource() }
-                                    NavigationRailItem(
-                                        selected = selected,
-                                        onClick = { navigateTo(dest.route) },
-                                        interactionSource = railInteraction,
-                                        icon = {
-                                            Icon(
-                                                imageVector = if (selected) dest.selectedIcon else dest.unselectedIcon,
-                                                contentDescription = label
-                                            )
-                                        },
-                                        label = { Text(label, maxLines = 1) },
-                                        colors = NavigationRailItemDefaults.colors(
-                                            indicatorColor = WaqtGold.copy(alpha = 0.28f)
-                                        ),
-                                        modifier = Modifier
-                                            .waqtPressScale(railInteraction, reduceMotion)
-                                            .testTag("rail_${dest.route}")
-                                    )
+                                NavigationRail(
+                                    containerColor = Color.Transparent
+                                ) {
+                                    WaqtDestination.entries.forEach { dest ->
+                                        val selected = currentRoute == dest.route
+                                        val label = dest.label(strings)
+                                        val railInteraction = remember { MutableInteractionSource() }
+                                        NavigationRailItem(
+                                            selected = selected,
+                                            onClick = { navigateTo(dest.route) },
+                                            interactionSource = railInteraction,
+                                            icon = {
+                                                Icon(
+                                                    imageVector = if (selected) dest.selectedIcon else dest.unselectedIcon,
+                                                    contentDescription = label
+                                                )
+                                            },
+                                            label = {
+                                                Text(
+                                                    text = label,
+                                                    maxLines = 1,
+                                                    softWrap = false,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            },
+                                            colors = NavigationRailItemDefaults.colors(
+                                                indicatorColor = WaqtGold.copy(alpha = 0.24f)
+                                            ),
+                                            modifier = Modifier
+                                                .waqtPressScale(railInteraction, reduceMotion)
+                                                .testTag("rail_${dest.route}")
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -242,30 +299,30 @@ fun WaqtApp(viewModel: MainViewModel) {
                                 if (reduceMotion) {
                                     EnterTransition.None
                                 } else {
-                                    fadeIn(tween(220, easing = FastOutSlowInEasing)) +
-                                        slideInHorizontally(tween(220, easing = FastOutSlowInEasing)) { it / 16 }
+                                    fadeIn(tween(180, easing = FastOutSlowInEasing)) +
+                                        slideInHorizontally(tween(180, easing = FastOutSlowInEasing)) { it / 20 }
                                 }
                             },
                             exitTransition = {
                                 if (reduceMotion) {
                                     ExitTransition.None
                                 } else {
-                                    fadeOut(tween(170)) +
-                                        slideOutHorizontally(tween(170)) { -it / 24 }
+                                    fadeOut(tween(140)) +
+                                        slideOutHorizontally(tween(140)) { -it / 28 }
                                 }
                             },
                             popEnterTransition = {
                                 if (reduceMotion) {
                                     EnterTransition.None
                                 } else {
-                                    fadeIn(tween(220, easing = FastOutSlowInEasing))
+                                    fadeIn(tween(180, easing = FastOutSlowInEasing))
                                 }
                             },
                             popExitTransition = {
                                 if (reduceMotion) {
                                     ExitTransition.None
                                 } else {
-                                    fadeOut(tween(170))
+                                    fadeOut(tween(140))
                                 }
                             }
                         ) {
@@ -276,7 +333,8 @@ fun WaqtApp(viewModel: MainViewModel) {
                                     strings = strings,
                                     onOpenLocationPicker = openLocationPicker,
                                     onTogglePrayerAlert = viewModel::togglePrayerNotification,
-                                    onToggleTahajjudAlert = viewModel::toggleTahajjudAlert
+                                    onToggleTahajjudAlert = viewModel::toggleTahajjudAlert,
+                                    bottomBarPadding = bottomBarPadding
                                 )
                             }
                             composable(WaqtDestination.SEHRI_IFTAR.route) {
@@ -286,7 +344,8 @@ fun WaqtApp(viewModel: MainViewModel) {
                                     strings = strings,
                                     onSelectDate = viewModel::setSehriDate,
                                     onSelectMonth = viewModel::setSehriMonth,
-                                    onOpenLocationPicker = openLocationPicker
+                                    onOpenLocationPicker = openLocationPicker,
+                                    bottomBarPadding = bottomBarPadding
                                 )
                             }
                             composable(WaqtDestination.ALARMS.route) {
@@ -299,7 +358,8 @@ fun WaqtApp(viewModel: MainViewModel) {
                                     onSelectReminder = viewModel::setReminderOption,
                                     onSelectTone = viewModel::setNotificationTone,
                                     onSendTestNotification = viewModel::sendTestNotification,
-                                    onRefreshPermissions = viewModel::refreshSystemPermissionStates
+                                    onRefreshPermissions = viewModel::refreshSystemPermissionStates,
+                                    bottomBarPadding = bottomBarPadding
                                 )
                             }
                             composable(WaqtDestination.SETTINGS.route) {
@@ -311,7 +371,8 @@ fun WaqtApp(viewModel: MainViewModel) {
                                     onToggleReduceMotion = viewModel::setReduceMotion,
                                     onOpenLocationPicker = openLocationPicker,
                                     onSelectMethod = viewModel::setCalculationMethod,
-                                    onSelectAsrJuristic = viewModel::setAsrJuristic
+                                    onSelectAsrJuristic = viewModel::setAsrJuristic,
+                                    bottomBarPadding = bottomBarPadding
                                 )
                             }
                         }

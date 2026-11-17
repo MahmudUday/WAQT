@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.BangladeshLocations
@@ -87,5 +88,25 @@ class ExampleRobolectricTest {
         composeRule.onNodeWithTag("prayer_card_isha").assertExists()
         composeRule.onNodeWithTag("home_prayer_list").performScrollToNode(hasTestTag("tahajjud_section_card"))
         composeRule.onNodeWithTag("tahajjud_section_card").assertExists()
+    }
+
+    @Test
+    fun `glass bottom bar navigates smoothly across all tabs`() {
+        composeRule.mainClock.advanceTimeBy(1800L)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("nav_sehri_iftar").assertExists().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("sehri_list").performScrollToNode(hasTestTag("sehri_time_card"))
+        composeRule.onNodeWithTag("sehri_time_card").assertExists()
+
+        composeRule.onNodeWithTag("nav_alarms").assertExists().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("alarms_list").performScrollToNode(hasTestTag("waqt_end_alert_switch"))
+        composeRule.onNodeWithTag("waqt_end_alert_switch").assertExists()
+
+        composeRule.onNodeWithTag("nav_settings").assertExists().performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("settings_list").performScrollToNode(hasTestTag("theme_chip_dark"))
+        composeRule.onNodeWithTag("theme_chip_dark").assertExists()
     }
 }

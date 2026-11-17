@@ -103,19 +103,44 @@ jobs:
             echo "enabled=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Build Signed Release APK (if secrets configured)
-        if: steps.check_signing.outputs.enabled == 'true'
+      - name: Prepare Release Keystore (Secrets or Preview Signing Key)
         env:
+          HAS_SIGNING_SECRETS: ${{ steps.check_signing.outputs.enabled }}
           UPLOAD_KEYSTORE_BASE64: ${{ secrets.UPLOAD_KEYSTORE_BASE64 }}
-          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          echo "$UPLOAD_KEYSTORE_BASE64" | base64 --decode > "${{ github.workspace }}/my-upload-key.jks"
-          KEYSTORE_PATH="${{ github.workspace }}/my-upload-key.jks" gradle :app:assembleRelease --no-daemon
+          if [ "$HAS_SIGNING_SECRETS" = "true" ]; then
+            echo "$UPLOAD_KEYSTORE_BASE64" | base64 --decode > "${{ github.workspace }}/my-upload-key.jks"
+          else
+            keytool -genkeypair -v \
+              -keystore "${{ github.workspace }}/my-upload-key.jks" \
+              -storepass waqtpreview \
+              -alias upload \
+              -keypass waqtpreview \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=WAQT Preview,O=WAQT,C=BD"
+          fi
+
+      - name: Build Non-Debuggable Release APK (120Hz/144Hz Optimized)
+        env:
+          HAS_SIGNING_SECRETS: ${{ steps.check_signing.outputs.enabled }}
+          SECRET_STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          SECRET_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ "$HAS_SIGNING_SECRETS" = "true" ]; then
+            export STORE_PASSWORD="$SECRET_STORE_PASSWORD"
+            export KEY_PASSWORD="$SECRET_KEY_PASSWORD"
+          else
+            export STORE_PASSWORD="waqtpreview"
+            export KEY_PASSWORD="waqtpreview"
+          fi
+          export KEYSTORE_PATH="${{ github.workspace }}/my-upload-key.jks"
+          gradle :app:assembleRelease --no-daemon
+          mkdir -p dist
           cp app/build/outputs/apk/release/app-release.apk dist/WAQT-v2.0.0-release.apk
 
-      - name: Upload Signed Release APK
-        if: steps.check_signing.outputs.enabled == 'true'
+      - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
           name: WAQT-Release-APK
