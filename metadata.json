@@ -1,0 +1,6 @@
+{
+  "name": "ওয়াক্ত (WAQT)",
+  "description": "Offline-first Islamic prayer times, Sehri & Iftar schedules, and reliable prayer alarms for Bangladesh.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
