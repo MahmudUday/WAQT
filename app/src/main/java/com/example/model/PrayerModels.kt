@@ -1,5 +1,6 @@
 package com.example.model
 
+import androidx.compose.runtime.Immutable
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -93,6 +94,7 @@ enum class LocationSource(val id: String) {
     }
 }
 
+@Immutable
 data class DistrictLocation(
     val id: String,
     val nameEn: String,
@@ -103,6 +105,7 @@ data class DistrictLocation(
     val longitude: Double
 )
 
+@Immutable
 data class DailyPrayerSchedule(
     val date: LocalDate,
     val locationNameEn: String,
@@ -143,6 +146,7 @@ data class DailyPrayerSchedule(
     }
 }
 
+@Immutable
 data class TahajjudSchedule(
     val startDateTime: LocalDateTime,
     val endDateTime: LocalDateTime,
@@ -154,6 +158,7 @@ data class TahajjudSchedule(
     val midnightTime: LocalTime get() = islamicMidnight.toLocalTime()
 }
 
+@Immutable
 data class UserSettings(
     val language: AppLanguage = AppLanguage.BENGALI,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,

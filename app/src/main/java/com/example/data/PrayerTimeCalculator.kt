@@ -1,5 +1,6 @@
 package com.example.data
 
+import androidx.compose.runtime.Immutable
 import com.example.model.AsrJuristic
 import com.example.model.CalculationMethod
 import com.example.model.DailyPrayerSchedule
@@ -21,6 +22,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.tan
 
+@Immutable
 data class PrayerPeriodStatus(
     val currentPrayer: PrayerType?,
     val nextPrayer: PrayerType,

@@ -13,6 +13,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -107,7 +108,17 @@ class MainActivity : ComponentActivity() {
             } else {
                 windowManager?.defaultDisplay
             } ?: return
-            val bestMode = displayObj.supportedModes.maxByOrNull { it.refreshRate } ?: return
+            val currentMode = displayObj.mode
+            val sameResolutionModes = displayObj.supportedModes.filter { mode ->
+                mode.physicalWidth == currentMode.physicalWidth &&
+                    mode.physicalHeight == currentMode.physicalHeight
+            }
+            val bestMode = (if (sameResolutionModes.isNotEmpty()) {
+                sameResolutionModes
+            } else {
+                displayObj.supportedModes.toList()
+            }).maxByOrNull { it.refreshRate } ?: return
+
             val params = window.attributes
             params.preferredDisplayModeId = bestMode.modeId
             params.preferredRefreshRate = bestMode.refreshRate
@@ -149,14 +160,16 @@ fun WaqtApp(viewModel: MainViewModel) {
                     bottomBar = {
                         if (!useNavRail) {
                             NavigationBar(
-                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
+                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.76f)
                             ) {
                                 WaqtDestination.entries.forEach { dest ->
                                     val selected = currentRoute == dest.route
                                     val label = dest.label(strings)
+                                    val itemInteraction = remember { MutableInteractionSource() }
                                     NavigationBarItem(
                                         selected = selected,
                                         onClick = { navigateTo(dest.route) },
+                                        interactionSource = itemInteraction,
                                         icon = {
                                             Icon(
                                                 imageVector = if (selected) dest.selectedIcon else dest.unselectedIcon,
@@ -170,7 +183,7 @@ fun WaqtApp(viewModel: MainViewModel) {
                                             indicatorColor = WaqtGold.copy(alpha = 0.28f)
                                         ),
                                         modifier = Modifier
-                                            .waqtPressScale(reduceMotion = reduceMotion)
+                                            .waqtPressScale(itemInteraction, reduceMotion)
                                             .testTag("nav_${dest.route}")
                                     )
                                 }
@@ -185,14 +198,16 @@ fun WaqtApp(viewModel: MainViewModel) {
                     ) {
                         if (useNavRail) {
                             NavigationRail(
-                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
+                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.76f)
                             ) {
                                 WaqtDestination.entries.forEach { dest ->
                                     val selected = currentRoute == dest.route
                                     val label = dest.label(strings)
+                                    val railInteraction = remember { MutableInteractionSource() }
                                     NavigationRailItem(
                                         selected = selected,
                                         onClick = { navigateTo(dest.route) },
+                                        interactionSource = railInteraction,
                                         icon = {
                                             Icon(
                                                 imageVector = if (selected) dest.selectedIcon else dest.unselectedIcon,
@@ -204,7 +219,7 @@ fun WaqtApp(viewModel: MainViewModel) {
                                             indicatorColor = WaqtGold.copy(alpha = 0.28f)
                                         ),
                                         modifier = Modifier
-                                            .waqtPressScale(reduceMotion = reduceMotion)
+                                            .waqtPressScale(railInteraction, reduceMotion)
                                             .testTag("rail_${dest.route}")
                                     )
                                 }
@@ -219,30 +234,30 @@ fun WaqtApp(viewModel: MainViewModel) {
                                 if (reduceMotion) {
                                     EnterTransition.None
                                 } else {
-                                    fadeIn(tween(240, easing = FastOutSlowInEasing)) +
-                                        slideInHorizontally(tween(240, easing = FastOutSlowInEasing)) { it / 16 }
+                                    fadeIn(tween(220, easing = FastOutSlowInEasing)) +
+                                        slideInHorizontally(tween(220, easing = FastOutSlowInEasing)) { it / 16 }
                                 }
                             },
                             exitTransition = {
                                 if (reduceMotion) {
                                     ExitTransition.None
                                 } else {
-                                    fadeOut(tween(180)) +
-                                        slideOutHorizontally(tween(180)) { -it / 24 }
+                                    fadeOut(tween(170)) +
+                                        slideOutHorizontally(tween(170)) { -it / 24 }
                                 }
                             },
                             popEnterTransition = {
                                 if (reduceMotion) {
                                     EnterTransition.None
                                 } else {
-                                    fadeIn(tween(240, easing = FastOutSlowInEasing))
+                                    fadeIn(tween(220, easing = FastOutSlowInEasing))
                                 }
                             },
                             popExitTransition = {
                                 if (reduceMotion) {
                                     ExitTransition.None
                                 } else {
-                                    fadeOut(tween(180))
+                                    fadeOut(tween(170))
                                 }
                             }
                         ) {

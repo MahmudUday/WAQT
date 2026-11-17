@@ -1,5 +1,6 @@
 package com.example.ui.strings
 
+import androidx.compose.runtime.Immutable
 import com.example.model.AppLanguage
 import com.example.model.AsrJuristic
 import com.example.model.CalculationMethod
@@ -8,6 +9,7 @@ import com.example.model.PrayerType
 import com.example.model.ReminderOption
 import com.example.model.ThemeMode
 
+@Immutable
 class WaqtStrings(val language: AppLanguage) {
 
     private val bn: Boolean get() = language == AppLanguage.BENGALI

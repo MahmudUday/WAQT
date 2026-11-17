@@ -4,6 +4,7 @@ import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
@@ -69,6 +71,8 @@ fun LocationPickerSheet(
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var searchQuery by remember { mutableStateOf("") }
+    val listState = rememberLazyListState()
+    val gpsBtnInteraction = remember { MutableInteractionSource() }
 
     val filteredDistricts = remember(searchQuery) {
         BangladeshLocations.search(searchQuery)
@@ -89,7 +93,7 @@ fun LocationPickerSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface
+        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f)
     ) {
         Column(
             modifier = Modifier
@@ -134,9 +138,11 @@ fun LocationPickerSheet(
                     }
                 },
                 enabled = !isDetectingGps,
+                interactionSource = gpsBtnInteraction,
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 48.dp)
+                    .waqtPressScale(gpsBtnInteraction)
                     .testTag("detect_gps_button"),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
@@ -198,6 +204,7 @@ fun LocationPickerSheet(
             Spacer(modifier = Modifier.height(12.dp))
 
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 380.dp),
@@ -216,49 +223,55 @@ fun LocationPickerSheet(
                         "${district.nameBn} • ${district.divisionEn} Division"
                     }
 
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 56.dp)
-                            .clickable {
-                                onSelectDistrict(district)
-                                onDismiss()
-                            }
-                            .padding(horizontal = 8.dp, vertical = 10.dp)
-                            .testTag("district_item_${district.id}"),
-                        verticalAlignment = Alignment.CenterVertically
+                            .waqtScrollItemMotion(listState, district.id)
                     ) {
-                        Icon(
-                            imageVector = Icons.Rounded.LocationOn,
-                            contentDescription = null,
-                            tint = if (isSelected) {
-                                MaterialTheme.colorScheme.secondary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = primaryName,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                            )
-                            Text(
-                                text = secondaryName,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        if (isSelected) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 56.dp)
+                                .clickable {
+                                    onSelectDistrict(district)
+                                    onDismiss()
+                                }
+                                .padding(horizontal = 8.dp, vertical = 10.dp)
+                                .testTag("district_item_${district.id}"),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Icon(
-                                imageVector = Icons.Rounded.CheckCircle,
+                                imageVector = Icons.Rounded.LocationOn,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.secondary
+                                tint = if (isSelected) {
+                                    MaterialTheme.colorScheme.secondary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                }
                             )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = primaryName,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                                Text(
+                                    text = secondaryName,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Rounded.CheckCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.secondary
+                                )
+                            }
                         }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
                 }
             }
         }

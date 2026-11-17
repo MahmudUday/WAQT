@@ -9,6 +9,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AlarmOn
@@ -69,6 +71,7 @@ import com.example.model.ReminderOption
 import com.example.ui.WaqtUiState
 import com.example.ui.components.WaqtGlassCard
 import com.example.ui.components.waqtPressScale
+import com.example.ui.components.waqtScrollItemMotion
 import com.example.ui.strings.WaqtStrings
 import com.example.ui.theme.WaqtAmber
 import com.example.ui.theme.WaqtEmerald
@@ -92,6 +95,8 @@ fun AlarmsScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     var testSentFeedback by remember { mutableStateOf(false) }
     val reduceMotion = uiState.settings.reduceMotion
+    val listState = rememberLazyListState()
+    val testBtnInteraction = remember { MutableInteractionSource() }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -114,6 +119,7 @@ fun AlarmsScreen(
         contentAlignment = Alignment.TopCenter
     ) {
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .widthIn(max = 720.dp),
@@ -121,17 +127,21 @@ fun AlarmsScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item(key = "header") {
-                Text(
-                    text = strings.alarmsTitle,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = strings.alarmsSubtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Column(
+                    modifier = Modifier.waqtScrollItemMotion(listState, "header", reduceMotion)
+                ) {
+                    Text(
+                        text = strings.alarmsTitle,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = strings.alarmsSubtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             if (!uiState.hasNotificationPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -144,6 +154,7 @@ fun AlarmsScreen(
                         icon = Icons.Rounded.NotificationsActive,
                         reduceMotion = reduceMotion,
                         testTag = "grant_notification_permission_button",
+                        modifier = Modifier.waqtScrollItemMotion(listState, "notif_perm", reduceMotion),
                         onAction = {
                             notificationPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                         }
@@ -161,6 +172,7 @@ fun AlarmsScreen(
                         icon = Icons.Rounded.Schedule,
                         reduceMotion = reduceMotion,
                         testTag = "grant_exact_alarm_button",
+                        modifier = Modifier.waqtScrollItemMotion(listState, "exact_alarm_perm", reduceMotion),
                         onAction = {
                             runCatching {
                                 val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
@@ -183,6 +195,7 @@ fun AlarmsScreen(
                         icon = Icons.Rounded.BatteryAlert,
                         reduceMotion = reduceMotion,
                         testTag = "battery_optimization_button",
+                        modifier = Modifier.waqtScrollItemMotion(listState, "battery_tip", reduceMotion),
                         onAction = {
                             runCatching {
                                 val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
@@ -198,8 +211,10 @@ fun AlarmsScreen(
                 Surface(
                     color = WaqtEmerald.copy(alpha = 0.14f),
                     shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, WaqtEmerald.copy(alpha = 0.28f)),
-                    modifier = Modifier.fillMaxWidth()
+                    border = BorderStroke(1.dp, WaqtEmerald.copy(alpha = 0.30f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .waqtScrollItemMotion(listState, "active_summary", reduceMotion)
                 ) {
                     Row(
                         modifier = Modifier.padding(14.dp),
@@ -223,7 +238,11 @@ fun AlarmsScreen(
 
             // 20-Min Before Waqt Ends + Tahajjud Smart Alerts Card
             item(key = "smart_alerts_card") {
-                WaqtGlassCard(modifier = Modifier.fillMaxWidth()) {
+                WaqtGlassCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .waqtScrollItemMotion(listState, "smart_alerts_card", reduceMotion)
+                ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(
                             modifier = Modifier
@@ -300,7 +319,11 @@ fun AlarmsScreen(
 
             // Individual 5 Prayer Toggles
             item(key = "prayer_toggles") {
-                WaqtGlassCard(modifier = Modifier.fillMaxWidth()) {
+                WaqtGlassCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .waqtScrollItemMotion(listState, "prayer_toggles", reduceMotion)
+                ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
                             text = strings.prayerTogglesHeader,
@@ -345,7 +368,11 @@ fun AlarmsScreen(
 
             // Pre-Prayer Start Reminder Selector (Off, 5, 20, 40 min)
             item(key = "reminder_options") {
-                WaqtGlassCard(modifier = Modifier.fillMaxWidth()) {
+                WaqtGlassCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .waqtScrollItemMotion(listState, "reminder_options", reduceMotion)
+                ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
                             text = strings.reminderBeforeHeader,
@@ -359,12 +386,14 @@ fun AlarmsScreen(
                         ) {
                             ReminderOption.entries.forEach { option ->
                                 val selected = uiState.settings.reminderOption == option
+                                val chipInteraction = remember { MutableInteractionSource() }
                                 FilterChip(
                                     selected = selected,
                                     onClick = { onSelectReminder(option) },
+                                    interactionSource = chipInteraction,
                                     label = { Text(strings.reminderLabel(option)) },
                                     modifier = Modifier
-                                        .waqtPressScale(reduceMotion = reduceMotion)
+                                        .waqtPressScale(chipInteraction, reduceMotion)
                                         .testTag("reminder_chip_${option.minutesBefore}")
                                 )
                             }
@@ -375,7 +404,11 @@ fun AlarmsScreen(
 
             // Alarm & Notification Tone Selector
             item(key = "tone_selector") {
-                WaqtGlassCard(modifier = Modifier.fillMaxWidth()) {
+                WaqtGlassCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .waqtScrollItemMotion(listState, "tone_selector", reduceMotion)
+                ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
                             text = strings.toneHeader,
@@ -389,7 +422,6 @@ fun AlarmsScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .heightIn(min = 48.dp)
-                                    .waqtPressScale(reduceMotion = reduceMotion)
                                     .clickable { onSelectTone(tone) }
                                     .testTag("tone_option_${tone.id}"),
                                 verticalAlignment = Alignment.CenterVertically
@@ -420,10 +452,12 @@ fun AlarmsScreen(
                             testSentFeedback = true
                         }
                     },
+                    interactionSource = testBtnInteraction,
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 48.dp)
-                        .waqtPressScale(reduceMotion = reduceMotion)
+                        .waqtScrollItemMotion(listState, "test_notif", reduceMotion)
+                        .waqtPressScale(testBtnInteraction, reduceMotion)
                         .testTag("send_test_notification_button"),
                     shape = RoundedCornerShape(14.dp)
                 ) {
@@ -452,13 +486,15 @@ private fun PermissionWarningCard(
     icon: ImageVector,
     reduceMotion: Boolean,
     testTag: String,
-    onAction: () -> Unit
+    onAction: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
+    val btnInteraction = remember { MutableInteractionSource() }
     Card(
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = accent.copy(alpha = 0.13f)),
-        border = BorderStroke(1.dp, accent.copy(alpha = 0.42f)),
-        modifier = Modifier.fillMaxWidth()
+        colors = CardDefaults.cardColors(containerColor = accent.copy(alpha = 0.14f)),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.44f)),
+        modifier = modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -480,9 +516,10 @@ private fun PermissionWarningCard(
             Spacer(modifier = Modifier.height(10.dp))
             Button(
                 onClick = onAction,
+                interactionSource = btnInteraction,
                 modifier = Modifier
                     .heightIn(min = 48.dp)
-                    .waqtPressScale(reduceMotion = reduceMotion)
+                    .waqtPressScale(btnInteraction, reduceMotion)
                     .testTag(testTag)
             ) {
                 Text(buttonLabel)

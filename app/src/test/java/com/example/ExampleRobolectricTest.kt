@@ -80,6 +80,7 @@ class ExampleRobolectricTest {
     fun `main activity launches and displays hero countdown and tahajjud cards`() {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("hero_countdown_card").assertExists()
+        composeRule.onNodeWithTag("hero_countdown_text").assertExists()
         composeRule.onNodeWithTag("home_prayer_list").performScrollToNode(hasTestTag("prayer_card_fajr"))
         composeRule.onNodeWithTag("prayer_card_fajr").assertExists()
         composeRule.onNodeWithTag("home_prayer_list").performScrollToNode(hasTestTag("prayer_card_isha"))

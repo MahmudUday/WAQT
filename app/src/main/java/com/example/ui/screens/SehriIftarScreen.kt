@@ -3,6 +3,7 @@ package com.example.ui.screens
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bedtime
@@ -35,15 +37,19 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.BengaliFormatter
@@ -54,6 +60,7 @@ import com.example.ui.LiveClockState
 import com.example.ui.WaqtUiState
 import com.example.ui.components.WaqtGlassCard
 import com.example.ui.components.waqtPressScale
+import com.example.ui.components.waqtScrollItemMotion
 import com.example.ui.strings.WaqtStrings
 import com.example.ui.theme.PrayerFajrAccent
 import com.example.ui.theme.PrayerMaghribAccent
@@ -73,7 +80,6 @@ fun SehriIftarScreen(
     onSelectMonth: (YearMonth) -> Unit,
     onOpenLocationPicker: () -> Unit
 ) {
-    val liveClock by liveClockFlow.collectAsStateWithLifecycle()
     val lang = uiState.settings.language
     val reduceMotion = uiState.settings.reduceMotion
     val selectedSchedule = uiState.selectedSehriSchedule ?: uiState.todaySchedule
@@ -82,13 +88,24 @@ fun SehriIftarScreen(
     } else {
         uiState.settings.locationNameEn
     }
-    val selectedHijri = HijriCalendarHelper.fromGregorian(uiState.selectedSehriDate)
+    val selectedHijri = remember(uiState.selectedSehriDate) {
+        HijriCalendarHelper.fromGregorian(uiState.selectedSehriDate)
+    }
+    val listState = rememberLazyListState()
+
+    val locationInteraction = remember { MutableInteractionSource() }
+    val prevDayInteraction = remember { MutableInteractionSource() }
+    val todayInteraction = remember { MutableInteractionSource() }
+    val nextDayInteraction = remember { MutableInteractionSource() }
+    val prevMonthInteraction = remember { MutableInteractionSource() }
+    val nextMonthInteraction = remember { MutableInteractionSource() }
 
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.TopCenter
     ) {
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .widthIn(max = 720.dp),
@@ -97,7 +114,9 @@ fun SehriIftarScreen(
         ) {
             item(key = "header") {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .waqtScrollItemMotion(listState, "header", reduceMotion),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -115,11 +134,16 @@ fun SehriIftarScreen(
                     }
                     Surface(
                         shape = RoundedCornerShape(50),
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.68f),
                         border = BorderStroke(1.dp, WaqtGold.copy(alpha = 0.45f)),
                         modifier = Modifier
-                            .waqtPressScale(reduceMotion = reduceMotion)
-                            .clickable(onClick = onOpenLocationPicker)
+                            .waqtPressScale(locationInteraction, reduceMotion)
+                            .clip(RoundedCornerShape(50))
+                            .clickable(
+                                interactionSource = locationInteraction,
+                                indication = ripple(),
+                                onClick = onOpenLocationPicker
+                            )
                             .testTag("sehri_location_chip")
                     ) {
                         Row(
@@ -142,45 +166,21 @@ fun SehriIftarScreen(
                 }
             }
 
-            liveClock.sehriIftarCountdown?.let { target ->
-                item(key = "countdown_banner") {
-                    Card(
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = WaqtNavy.copy(alpha = 0.92f)),
-                        border = BorderStroke(1.dp, WaqtGold.copy(alpha = 0.50f)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 18.dp, vertical = 14.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = if (target.isSehriNext) {
-                                    strings.sehriCountdownPrefix
-                                } else {
-                                    strings.iftarCountdownPrefix
-                                },
-                                style = MaterialTheme.typography.titleMedium,
-                                color = WaqtGoldSoft
-                            )
-                            Text(
-                                text = BengaliFormatter.formatCountdown(target.countdown, lang),
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = WaqtGold,
-                                modifier = Modifier.testTag("sehri_iftar_countdown")
-                            )
-                        }
-                    }
-                }
+            item(key = "countdown_banner") {
+                SehriCountdownBanner(
+                    liveClockFlow = liveClockFlow,
+                    language = lang,
+                    strings = strings,
+                    modifier = Modifier.waqtScrollItemMotion(listState, "countdown_banner", reduceMotion)
+                )
             }
 
             item(key = "date_nav") {
-                WaqtGlassCard(modifier = Modifier.fillMaxWidth()) {
+                WaqtGlassCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .waqtScrollItemMotion(listState, "date_nav", reduceMotion)
+                ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -190,9 +190,10 @@ fun SehriIftarScreen(
                     ) {
                         IconButton(
                             onClick = { onSelectDate(uiState.selectedSehriDate.minusDays(1)) },
+                            interactionSource = prevDayInteraction,
                             modifier = Modifier
                                 .minimumInteractiveComponentSize()
-                                .waqtPressScale(reduceMotion = reduceMotion)
+                                .waqtPressScale(prevDayInteraction, reduceMotion)
                                 .testTag("sehri_prev_day_button")
                         ) {
                             Icon(
@@ -222,9 +223,10 @@ fun SehriIftarScreen(
                         if (uiState.selectedSehriDate != uiState.todayDate) {
                             OutlinedButton(
                                 onClick = { onSelectDate(uiState.todayDate) },
+                                interactionSource = todayInteraction,
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                                 modifier = Modifier
-                                    .waqtPressScale(reduceMotion = reduceMotion)
+                                    .waqtPressScale(todayInteraction, reduceMotion)
                                     .testTag("sehri_today_button")
                             ) {
                                 Text(strings.todayButton, style = MaterialTheme.typography.labelMedium)
@@ -233,9 +235,10 @@ fun SehriIftarScreen(
 
                         IconButton(
                             onClick = { onSelectDate(uiState.selectedSehriDate.plusDays(1)) },
+                            interactionSource = nextDayInteraction,
                             modifier = Modifier
                                 .minimumInteractiveComponentSize()
-                                .waqtPressScale(reduceMotion = reduceMotion)
+                                .waqtPressScale(nextDayInteraction, reduceMotion)
                                 .testTag("sehri_next_day_button")
                         ) {
                             Icon(
@@ -250,7 +253,9 @@ fun SehriIftarScreen(
             if (selectedSchedule != null) {
                 item(key = "sehri_iftar_cards") {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .waqtScrollItemMotion(listState, "sehri_iftar_cards", reduceMotion),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         FastingBoundaryCard(
@@ -259,7 +264,6 @@ fun SehriIftarScreen(
                             note = strings.sehriCutoffNote,
                             accent = PrayerFajrAccent,
                             icon = Icons.Rounded.Bedtime,
-                            reduceMotion = reduceMotion,
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("sehri_time_card")
@@ -270,7 +274,6 @@ fun SehriIftarScreen(
                             note = strings.iftarCutoffNote,
                             accent = PrayerMaghribAccent,
                             icon = Icons.Rounded.WbTwilight,
-                            reduceMotion = reduceMotion,
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("iftar_time_card")
@@ -282,7 +285,9 @@ fun SehriIftarScreen(
             item(key = "month_header") {
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .waqtScrollItemMotion(listState, "month_header", reduceMotion),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -294,9 +299,10 @@ fun SehriIftarScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(
                             onClick = { onSelectMonth(uiState.selectedSehriMonth.minusMonths(1)) },
+                            interactionSource = prevMonthInteraction,
                             modifier = Modifier
                                 .minimumInteractiveComponentSize()
-                                .waqtPressScale(reduceMotion = reduceMotion)
+                                .waqtPressScale(prevMonthInteraction, reduceMotion)
                                 .testTag("sehri_prev_month_button")
                         ) {
                             Icon(
@@ -315,9 +321,10 @@ fun SehriIftarScreen(
                         )
                         IconButton(
                             onClick = { onSelectMonth(uiState.selectedSehriMonth.plusMonths(1)) },
+                            interactionSource = nextMonthInteraction,
                             modifier = Modifier
                                 .minimumInteractiveComponentSize()
-                                .waqtPressScale(reduceMotion = reduceMotion)
+                                .waqtPressScale(nextMonthInteraction, reduceMotion)
                                 .testTag("sehri_next_month_button")
                         ) {
                             Icon(
@@ -331,9 +338,12 @@ fun SehriIftarScreen(
 
             item(key = "table_columns") {
                 Surface(
-                    color = WaqtNavy.copy(alpha = 0.94f),
+                    color = WaqtNavy.copy(alpha = 0.80f),
                     shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    border = BorderStroke(1.dp, WaqtGold.copy(alpha = 0.30f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .waqtScrollItemMotion(listState, "table_columns", reduceMotion)
                 ) {
                     Row(
                         modifier = Modifier
@@ -369,18 +379,73 @@ fun SehriIftarScreen(
                 items = uiState.monthlySehriSchedules,
                 key = { it.date.toString() }
             ) { daySchedule ->
+                val dateKey = daySchedule.date.toString()
                 MonthlySehriRow(
                     schedule = daySchedule,
                     isToday = daySchedule.date == uiState.todayDate,
                     isSelected = daySchedule.date == uiState.selectedSehriDate,
                     language = lang,
-                    onClick = { onSelectDate(daySchedule.date) }
+                    onClick = { onSelectDate(daySchedule.date) },
+                    modifier = Modifier.waqtScrollItemMotion(listState, dateKey, reduceMotion)
                 )
             }
 
             item(key = "bottom_space") {
                 Spacer(modifier = Modifier.height(14.dp))
             }
+        }
+    }
+}
+
+/**
+ * Isolated 1-second observer so the 30-day timetable never recomposes every second.
+ */
+@Composable
+private fun SehriCountdownBanner(
+    liveClockFlow: StateFlow<LiveClockState>,
+    language: AppLanguage,
+    strings: WaqtStrings,
+    modifier: Modifier = Modifier
+) {
+    val liveClock by liveClockFlow.collectAsStateWithLifecycle()
+    val target = liveClock.sehriIftarCountdown ?: return
+
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = WaqtNavy.copy(alpha = 0.78f)),
+        border = BorderStroke(1.dp, WaqtGold.copy(alpha = 0.50f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = if (target.isSehriNext) {
+                    strings.sehriCountdownPrefix
+                } else {
+                    strings.iftarCountdownPrefix
+                },
+                style = MaterialTheme.typography.titleMedium,
+                color = WaqtGoldSoft,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = BengaliFormatter.formatCountdown(target.countdown, language),
+                style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
+                fontWeight = FontWeight.Bold,
+                color = WaqtGold,
+                maxLines = 1,
+                softWrap = false,
+                modifier = Modifier.testTag("sehri_iftar_countdown")
+            )
         }
     }
 }
@@ -392,11 +457,10 @@ private fun FastingBoundaryCard(
     note: String,
     accent: Color,
     icon: ImageVector,
-    reduceMotion: Boolean,
     modifier: Modifier = Modifier
 ) {
     WaqtGlassCard(
-        modifier = modifier.waqtPressScale(reduceMotion = reduceMotion),
+        modifier = modifier,
         borderColor = accent.copy(alpha = 0.45f),
         borderWidth = 1.3.dp
     ) {
@@ -419,7 +483,7 @@ private fun FastingBoundaryCard(
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = time,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -439,16 +503,17 @@ private fun MonthlySehriRow(
     isToday: Boolean,
     isSelected: Boolean,
     language: AppLanguage,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val bg = when {
-        isSelected -> WaqtGold.copy(alpha = 0.18f)
-        isToday -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
-        else -> MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)
+        isSelected -> WaqtGold.copy(alpha = 0.22f)
+        isToday -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.32f)
+        else -> MaterialTheme.colorScheme.surface.copy(alpha = 0.56f)
     }
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .background(bg)
             .clickable(onClick = onClick)
@@ -468,7 +533,7 @@ private fun MonthlySehriRow(
             )
             Text(
                 text = BengaliFormatter.formatShortTime(schedule.sehriEnd, language),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
                 fontWeight = FontWeight.SemiBold,
                 color = PrayerFajrAccent,
                 textAlign = TextAlign.Center,
@@ -476,13 +541,13 @@ private fun MonthlySehriRow(
             )
             Text(
                 text = BengaliFormatter.formatShortTime(schedule.iftarStart, language),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
                 fontWeight = FontWeight.SemiBold,
                 color = PrayerMaghribAccent,
                 textAlign = TextAlign.End,
                 modifier = Modifier.weight(1f)
             )
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f))
     }
 }

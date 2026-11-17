@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
@@ -42,9 +44,12 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -59,6 +64,7 @@ import com.example.model.ThemeMode
 import com.example.ui.WaqtUiState
 import com.example.ui.components.WaqtGlassCard
 import com.example.ui.components.waqtPressScale
+import com.example.ui.components.waqtScrollItemMotion
 import com.example.ui.strings.WaqtStrings
 import com.example.ui.theme.WaqtGold
 import com.example.ui.theme.WaqtGoldSoft
@@ -84,12 +90,15 @@ fun SettingsScreen(
     } else {
         settings.locationNameEn
     }
+    val listState = rememberLazyListState()
+    val locationCardInteraction = remember { MutableInteractionSource() }
 
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.TopCenter
     ) {
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .widthIn(max = 720.dp),
@@ -100,7 +109,8 @@ fun SettingsScreen(
                 Text(
                     text = strings.settingsTitle,
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.waqtScrollItemMotion(listState, "header", reduceMotion)
                 )
             }
 
@@ -108,8 +118,14 @@ fun SettingsScreen(
                 WaqtGlassCard(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .waqtPressScale(reduceMotion = reduceMotion)
-                        .clickable(onClick = onOpenLocationPicker)
+                        .waqtScrollItemMotion(listState, "location_card", reduceMotion)
+                        .waqtPressScale(locationCardInteraction, reduceMotion)
+                        .clip(RoundedCornerShape(20.dp))
+                        .clickable(
+                            interactionSource = locationCardInteraction,
+                            indication = ripple(),
+                            onClick = onOpenLocationPicker
+                        )
                         .testTag("settings_location_card")
                 ) {
                     Row(
@@ -142,7 +158,11 @@ fun SettingsScreen(
 
             // Language, Theme (Dark/Light/System) & Reduce Motion
             item(key = "appearance_card") {
-                WaqtGlassCard(modifier = Modifier.fillMaxWidth()) {
+                WaqtGlassCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .waqtScrollItemMotion(listState, "appearance_card", reduceMotion)
+                ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
                             text = strings.appearanceSection,
@@ -157,20 +177,24 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            val bnInteraction = remember { MutableInteractionSource() }
+                            val enInteraction = remember { MutableInteractionSource() }
                             FilterChip(
                                 selected = settings.language == AppLanguage.BENGALI,
                                 onClick = { onSelectLanguage(AppLanguage.BENGALI) },
+                                interactionSource = bnInteraction,
                                 label = { Text("বাংলা") },
                                 modifier = Modifier
-                                    .waqtPressScale(reduceMotion = reduceMotion)
+                                    .waqtPressScale(bnInteraction, reduceMotion)
                                     .testTag("lang_chip_bn")
                             )
                             FilterChip(
                                 selected = settings.language == AppLanguage.ENGLISH,
                                 onClick = { onSelectLanguage(AppLanguage.ENGLISH) },
+                                interactionSource = enInteraction,
                                 label = { Text("English") },
                                 modifier = Modifier
-                                    .waqtPressScale(reduceMotion = reduceMotion)
+                                    .waqtPressScale(enInteraction, reduceMotion)
                                     .testTag("lang_chip_en")
                             )
                         }
@@ -191,9 +215,11 @@ fun SettingsScreen(
                                     ThemeMode.LIGHT -> Icons.Rounded.LightMode
                                     ThemeMode.DARK -> Icons.Rounded.DarkMode
                                 }
+                                val modeInteraction = remember { MutableInteractionSource() }
                                 FilterChip(
                                     selected = settings.themeMode == mode,
                                     onClick = { onSelectThemeMode(mode) },
+                                    interactionSource = modeInteraction,
                                     leadingIcon = {
                                         Icon(
                                             imageVector = icon,
@@ -203,7 +229,7 @@ fun SettingsScreen(
                                     },
                                     label = { Text(strings.themeModeLabel(mode)) },
                                     modifier = Modifier
-                                        .waqtPressScale(reduceMotion = reduceMotion)
+                                        .waqtPressScale(modeInteraction, reduceMotion)
                                         .testTag("theme_chip_${mode.id}")
                                 )
                             }
@@ -244,7 +270,11 @@ fun SettingsScreen(
 
             // Calculation Method & Asr Juristic Rule
             item(key = "calculation_card") {
-                WaqtGlassCard(modifier = Modifier.fillMaxWidth()) {
+                WaqtGlassCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .waqtScrollItemMotion(listState, "calculation_card", reduceMotion)
+                ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
                             text = strings.calculationSection,
@@ -263,7 +293,6 @@ fun SettingsScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .heightIn(min = 48.dp)
-                                    .waqtPressScale(reduceMotion = reduceMotion)
                                     .clickable { onSelectAsrJuristic(rule) }
                                     .testTag("asr_rule_${rule.id}"),
                                 verticalAlignment = Alignment.CenterVertically
@@ -293,7 +322,6 @@ fun SettingsScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .heightIn(min = 48.dp)
-                                    .waqtPressScale(reduceMotion = reduceMotion)
                                     .clickable { onSelectMethod(method) }
                                     .testTag("calc_method_${method.id}"),
                                 verticalAlignment = Alignment.CenterVertically
@@ -311,7 +339,7 @@ fun SettingsScreen(
 
                         Spacer(modifier = Modifier.height(8.dp))
                         Surface(
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.56f),
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -330,11 +358,12 @@ fun SettingsScreen(
             item(key = "about_card") {
                 Card(
                     shape = RoundedCornerShape(22.dp),
-                    colors = CardDefaults.cardColors(containerColor = WaqtNavy.copy(alpha = 0.94f)),
+                    colors = CardDefaults.cardColors(containerColor = WaqtNavy.copy(alpha = 0.78f)),
                     border = BorderStroke(1.dp, WaqtGold.copy(alpha = 0.45f)),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                     modifier = Modifier
                         .fillMaxWidth()
+                        .waqtScrollItemMotion(listState, "about_card", reduceMotion)
                         .testTag("about_us_card")
                 ) {
                     Column(modifier = Modifier.padding(18.dp)) {
@@ -368,14 +397,12 @@ fun SettingsScreen(
                             icon = Icons.Rounded.Person,
                             label = strings.developerLabel,
                             value = strings.developerName,
-                            reduceMotion = reduceMotion,
                             onClick = null
                         )
                         AboutLinkRow(
                             icon = Icons.Rounded.Code,
                             label = strings.repositoryLabel,
                             value = "github.com/MahmudUday/namaz-app",
-                            reduceMotion = reduceMotion,
                             onClick = {
                                 runCatching {
                                     context.startActivity(
@@ -391,7 +418,6 @@ fun SettingsScreen(
                             icon = Icons.Rounded.Email,
                             label = strings.contactLabel,
                             value = "mahmududay.info@gmail.com",
-                            reduceMotion = reduceMotion,
                             onClick = {
                                 runCatching {
                                     context.startActivity(
@@ -407,7 +433,6 @@ fun SettingsScreen(
                             icon = Icons.Rounded.Info,
                             label = strings.versionLabel,
                             value = BuildConfig.VERSION_NAME,
-                            reduceMotion = reduceMotion,
                             onClick = null
                         )
                     }
@@ -423,7 +448,6 @@ private fun AboutLinkRow(
     icon: ImageVector,
     label: String,
     value: String,
-    reduceMotion: Boolean,
     onClick: (() -> Unit)?
 ) {
     Row(
@@ -431,11 +455,7 @@ private fun AboutLinkRow(
             .fillMaxWidth()
             .heightIn(min = 48.dp)
             .let { mod ->
-                if (onClick != null) {
-                    mod.waqtPressScale(reduceMotion = reduceMotion).clickable(onClick = onClick)
-                } else {
-                    mod
-                }
+                if (onClick != null) mod.clickable(onClick = onClick) else mod
             }
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically

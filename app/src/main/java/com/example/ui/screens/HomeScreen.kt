@@ -2,20 +2,15 @@ package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +18,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,6 +29,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -56,17 +53,17 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
@@ -85,6 +82,7 @@ import com.example.ui.LiveClockState
 import com.example.ui.WaqtUiState
 import com.example.ui.components.WaqtGlassCard
 import com.example.ui.components.waqtPressScale
+import com.example.ui.components.waqtScrollItemMotion
 import com.example.ui.strings.WaqtStrings
 import com.example.ui.theme.PrayerAsrAccent
 import com.example.ui.theme.PrayerAsrTintDark
@@ -109,13 +107,21 @@ import com.example.ui.theme.WaqtNavy
 import com.example.ui.theme.WaqtNavyCard
 import com.example.ui.theme.WaqtNavyDeep
 import kotlinx.coroutines.flow.StateFlow
-import kotlin.math.cos
-import kotlin.math.sin
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
+@Immutable
 private data class PrayerCardPalette(
     val accent: Color,
     val container: Color,
     val icon: ImageVector
+)
+
+@Immutable
+private data class HeroPeriodSummary(
+    val available: Boolean,
+    val currentPrayer: PrayerType?,
+    val nextPrayer: PrayerType
 )
 
 @Composable
@@ -127,7 +133,25 @@ fun HomeScreen(
     onTogglePrayerAlert: (PrayerType, Boolean) -> Unit,
     onToggleTahajjudAlert: (Boolean) -> Unit
 ) {
-    val liveClock by liveClockFlow.collectAsStateWithLifecycle()
+    val initialClock = remember(liveClockFlow) { liveClockFlow.value }
+    val periodSummary by remember(liveClockFlow) {
+        liveClockFlow
+            .map { clock ->
+                clock.periodStatus?.let { HeroPeriodSummary(true, it.currentPrayer, it.nextPrayer) }
+                    ?: HeroPeriodSummary(false, null, PrayerType.FAJR)
+            }
+            .distinctUntilChanged()
+    }.collectAsStateWithLifecycle(
+        initialValue = initialClock.periodStatus?.let {
+            HeroPeriodSummary(true, it.currentPrayer, it.nextPrayer)
+        } ?: HeroPeriodSummary(false, null, PrayerType.FAJR)
+    )
+    val isTahajjudActive by remember(liveClockFlow) {
+        liveClockFlow
+            .map { it.isTahajjudActiveNow }
+            .distinctUntilChanged()
+    }.collectAsStateWithLifecycle(initialValue = initialClock.isTahajjudActiveNow)
+
     val settings = uiState.settings
     val isDark = when (settings.themeMode) {
         ThemeMode.DARK -> true
@@ -135,13 +159,21 @@ fun HomeScreen(
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
     }
     val schedule = uiState.todaySchedule
-    val periodStatus = liveClock.periodStatus
+    val listState = rememberLazyListState()
+
+    val dateLabel = remember(uiState.todayDate, settings.language) {
+        BengaliFormatter.formatDate(uiState.todayDate, settings.language)
+    }
+    val hijriLabel = remember(uiState.hijriDate, settings.language) {
+        uiState.hijriDate.format(settings.language)
+    }
 
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.TopCenter
     ) {
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .widthIn(max = 720.dp)
@@ -149,13 +181,16 @@ fun HomeScreen(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Glassmorphic Animated Brand & Location Bar
+            // Glassmorphic Brand & Location Bar
             item(key = "header") {
                 WaqtHeaderBar(
-                    uiState = uiState,
+                    locationNameBn = settings.locationNameBn,
+                    locationNameEn = settings.locationNameEn,
+                    language = settings.language,
                     strings = strings,
                     reduceMotion = settings.reduceMotion,
-                    onOpenLocationPicker = onOpenLocationPicker
+                    onOpenLocationPicker = onOpenLocationPicker,
+                    modifier = Modifier.waqtScrollItemMotion(listState, "header", settings.reduceMotion)
                 )
             }
 
@@ -165,52 +200,52 @@ fun HomeScreen(
                     isOnline = uiState.isOnline,
                     isFromCache = uiState.isUsingCachedFallback,
                     isRamadan = uiState.hijriDate.isRamadan,
-                    strings = strings
+                    strings = strings,
+                    modifier = Modifier.waqtScrollItemMotion(listState, "offline_pill", settings.reduceMotion)
                 )
             }
 
-            // Modern Animated Glassmorphic WAQT Hero Section
-            if (schedule != null && periodStatus != null) {
+            // Translucent Glassmorphic WAQT Hero Section (1-second countdown isolated inside)
+            if (schedule != null && periodSummary.available) {
                 item(key = "hero_card") {
                     HeroCountdownCard(
                         schedule = schedule,
-                        currentPrayer = periodStatus.currentPrayer,
-                        nextPrayer = periodStatus.nextPrayer,
-                        elapsedFraction = periodStatus.elapsedFraction,
-                        countdownText = BengaliFormatter.formatCountdown(
-                            periodStatus.countdown,
-                            settings.language
-                        ),
-                        dateLabel = BengaliFormatter.formatDate(uiState.todayDate, settings.language),
-                        hijriLabel = uiState.hijriDate.format(settings.language),
+                        currentPrayer = periodSummary.currentPrayer,
+                        nextPrayer = periodSummary.nextPrayer,
+                        liveClockFlow = liveClockFlow,
+                        dateLabel = dateLabel,
+                        hijriLabel = hijriLabel,
                         reduceMotion = settings.reduceMotion,
-                        strings = strings
+                        strings = strings,
+                        modifier = Modifier.waqtScrollItemMotion(listState, "hero_card", settings.reduceMotion)
                     )
                 }
 
-                // Five Distinct Color Glass Prayer Cards
+                // Five Distinct Color Glass Prayer Cards (no per-second recomposition!)
                 items(
                     items = PrayerType.entries,
                     key = { it.name }
                 ) { prayer ->
                     val palette = remember(prayer, isDark) { prayerPalette(prayer, isDark) }
-                    val isCurrent = periodStatus.currentPrayer == prayer
-                    val isNext = periodStatus.nextPrayer == prayer
+                    val isCurrent = periodSummary.currentPrayer == prayer
+                    val isNext = periodSummary.nextPrayer == prayer
                     val isAlertEnabled = prayer in settings.enabledPrayers
+                    val timeText = remember(schedule, prayer, settings.language) {
+                        BengaliFormatter.formatTime(schedule.timeFor(prayer), settings.language)
+                    }
 
                     PrayerColorCard(
                         prayer = prayer,
-                        timeText = BengaliFormatter.formatTime(
-                            schedule.timeFor(prayer),
-                            settings.language
-                        ),
+                        timeText = timeText,
                         palette = palette,
+                        isDark = isDark,
                         isCurrent = isCurrent,
                         isNext = isNext,
                         isAlertEnabled = isAlertEnabled,
                         reduceMotion = settings.reduceMotion,
                         strings = strings,
-                        onToggleAlert = { onTogglePrayerAlert(prayer, !isAlertEnabled) }
+                        onToggleAlert = { onTogglePrayerAlert(prayer, !isAlertEnabled) },
+                        modifier = Modifier.waqtScrollItemMotion(listState, prayer.name, settings.reduceMotion)
                     )
                 }
             }
@@ -220,12 +255,13 @@ fun HomeScreen(
                 item(key = "tahajjud_section") {
                     TahajjudGlassCard(
                         tahajjud = tahajjud,
-                        isActiveNow = liveClock.isTahajjudActiveNow,
+                        isActiveNow = isTahajjudActive,
                         isAlarmEnabled = settings.tahajjudAlertEnabled,
                         language = settings.language,
                         reduceMotion = settings.reduceMotion,
                         strings = strings,
-                        onToggleAlarm = { onToggleTahajjudAlert(!settings.tahajjudAlertEnabled) }
+                        onToggleAlarm = { onToggleTahajjudAlert(!settings.tahajjudAlertEnabled) },
+                        modifier = Modifier.waqtScrollItemMotion(listState, "tahajjud_section", settings.reduceMotion)
                     )
                 }
             }
@@ -239,21 +275,20 @@ fun HomeScreen(
 
 @Composable
 private fun WaqtHeaderBar(
-    uiState: WaqtUiState,
+    locationNameBn: String,
+    locationNameEn: String,
+    language: AppLanguage,
     strings: WaqtStrings,
     reduceMotion: Boolean,
-    onOpenLocationPicker: () -> Unit
+    onOpenLocationPicker: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val settings = uiState.settings
-    val locationLabel = if (settings.language == AppLanguage.BENGALI) {
-        settings.locationNameBn
-    } else {
-        settings.locationNameEn
-    }
+    val locationLabel = if (language == AppLanguage.BENGALI) locationNameBn else locationNameEn
+    val locationInteraction = remember { MutableInteractionSource() }
 
     WaqtGlassCard(
         shape = RoundedCornerShape(20.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
@@ -266,12 +301,11 @@ private fun WaqtHeaderBar(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
             ) {
-                // Mini Navy & Gold Crescent Emblem
                 Box(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .background(WaqtNavy),
+                        .background(WaqtNavy.copy(alpha = 0.88f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -287,7 +321,9 @@ private fun WaqtHeaderBar(
                         text = strings.fullBrandName,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = strings.appSubtitle,
@@ -307,9 +343,13 @@ private fun WaqtHeaderBar(
                 border = BorderStroke(1.dp, WaqtGold.copy(alpha = 0.45f)),
                 modifier = Modifier
                     .heightIn(min = 48.dp)
-                    .waqtPressScale(reduceMotion = reduceMotion)
+                    .waqtPressScale(locationInteraction, reduceMotion)
                     .clip(RoundedCornerShape(50))
-                    .clickable(onClick = onOpenLocationPicker)
+                    .clickable(
+                        interactionSource = locationInteraction,
+                        indication = androidx.compose.material3.ripple(),
+                        onClick = onOpenLocationPicker
+                    )
                     .testTag("location_picker_button")
             ) {
                 Row(
@@ -347,10 +387,11 @@ private fun OfflineStatusPill(
     isOnline: Boolean,
     isFromCache: Boolean,
     isRamadan: Boolean,
-    strings: WaqtStrings
+    strings: WaqtStrings,
+    modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -365,7 +406,7 @@ private fun OfflineStatusPill(
         Surface(
             color = bgColor,
             shape = RoundedCornerShape(50),
-            border = BorderStroke(1.dp, fgColor.copy(alpha = 0.25f)),
+            border = BorderStroke(1.dp, fgColor.copy(alpha = 0.28f)),
             modifier = Modifier.testTag("offline_status_pill")
         ) {
             Row(
@@ -382,7 +423,9 @@ private fun OfflineStatusPill(
                 Text(
                     text = if (offlineState) strings.offlineCachedBadge else strings.onlineSyncedBadge,
                     style = MaterialTheme.typography.labelMedium,
-                    color = fgColor
+                    color = fgColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
@@ -398,7 +441,8 @@ private fun OfflineStatusPill(
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    maxLines = 1
                 )
             }
         }
@@ -410,122 +454,88 @@ private fun HeroCountdownCard(
     schedule: DailyPrayerSchedule,
     currentPrayer: PrayerType?,
     nextPrayer: PrayerType,
-    elapsedFraction: Float,
-    countdownText: String,
+    liveClockFlow: StateFlow<LiveClockState>,
     dateLabel: String,
     hijriLabel: String,
     reduceMotion: Boolean,
-    strings: WaqtStrings
+    strings: WaqtStrings,
+    modifier: Modifier = Modifier
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "hero_ambient")
-    val pulseAlpha by if (reduceMotion) {
-        remember { androidx.compose.runtime.mutableFloatStateOf(0.85f) }
-    } else {
-        infiniteTransition.animateFloat(
-            initialValue = 0.45f,
-            targetValue = 1.0f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(1400, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "pulse_dot"
+    val borderBrush = remember {
+        Brush.verticalGradient(
+            listOf(
+                WaqtGoldBright.copy(alpha = 0.72f),
+                WaqtGold.copy(alpha = 0.22f)
+            )
         )
     }
-
-    val orbitAngle by if (reduceMotion) {
-        remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
-    } else {
-        infiniteTransition.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(22000, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            ),
-            label = "hero_orbit"
+    val heroFillBrush = remember {
+        Brush.linearGradient(
+            colors = listOf(
+                WaqtNavyDeep.copy(alpha = 0.80f),
+                WaqtNavy.copy(alpha = 0.74f),
+                WaqtNavyCard.copy(alpha = 0.70f)
+            )
         )
     }
-
-    val animatedProgress by animateFloatAsState(
-        targetValue = elapsedFraction.coerceIn(0f, 1f),
-        animationSpec = tween(durationMillis = if (reduceMotion) 0 else 500),
-        label = "waqt_progress"
-    )
 
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .testTag("hero_countdown_card"),
         shape = RoundedCornerShape(26.dp),
-        border = BorderStroke(
-            width = 1.2.dp,
-            brush = Brush.verticalGradient(
-                listOf(
-                    WaqtGoldBright.copy(alpha = 0.72f),
-                    WaqtGold.copy(alpha = 0.25f)
-                )
-            )
-        ),
-        colors = CardDefaults.cardColors(containerColor = WaqtNavy.copy(alpha = 0.92f)),
+        border = BorderStroke(width = 1.2.dp, brush = borderBrush),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(
-                            WaqtNavyDeep.copy(alpha = 0.95f),
-                            WaqtNavy.copy(alpha = 0.90f),
-                            WaqtNavyCard.copy(alpha = 0.88f)
-                        )
+                .background(heroFillBrush)
+                .drawWithCache {
+                    val w = size.width
+                    val h = size.height
+                    val orbitCenter = Offset(w * 0.86f, h * 0.26f)
+                    val orbitRadius = h * 0.44f
+                    val glowStroke = Stroke(width = 1.2.dp.toPx())
+                    val archStroke = Stroke(width = 1.5.dp.toPx())
+                    val starPos = Offset(
+                        orbitCenter.x - orbitRadius * 0.72f,
+                        orbitCenter.y + orbitRadius * 0.68f
                     )
-                )
-        ) {
-            // Animated Celestial Orbit & Islamic Arch Motif
-            Canvas(modifier = Modifier.matchParentSize()) {
-                val w = size.width
-                val h = size.height
-                val orbitCenter = Offset(w * 0.86f, h * 0.26f)
-                val orbitRadius = h * 0.44f
-
-                drawCircle(
-                    color = WaqtGold.copy(alpha = 0.08f),
-                    radius = orbitRadius * 1.25f,
-                    center = orbitCenter
-                )
-                drawCircle(
-                    color = WaqtGold.copy(alpha = 0.16f),
-                    radius = orbitRadius,
-                    center = orbitCenter,
-                    style = Stroke(width = 1.2.dp.toPx())
-                )
-
-                val rad = Math.toRadians(orbitAngle.toDouble())
-                val starX = orbitCenter.x + (orbitRadius * cos(rad)).toFloat()
-                val starY = orbitCenter.y + (orbitRadius * sin(rad)).toFloat()
-                drawCircle(
-                    color = WaqtGoldBright.copy(alpha = 0.85f),
-                    radius = 3.2.dp.toPx(),
-                    center = Offset(starX, starY)
-                )
-
-                // Specular glass highlight arc along top-left
-                val arch = Path().apply {
-                    moveTo(w * 0.56f, h)
-                    quadraticTo(w * 0.78f, h * 0.44f, w, h * 0.72f)
+                    val arch = Path().apply {
+                        moveTo(w * 0.56f, h)
+                        quadraticTo(w * 0.78f, h * 0.44f, w, h * 0.72f)
+                    }
+                    onDrawBehind {
+                        drawCircle(
+                            color = WaqtGold.copy(alpha = 0.08f),
+                            radius = orbitRadius * 1.24f,
+                            center = orbitCenter
+                        )
+                        drawCircle(
+                            color = WaqtGold.copy(alpha = 0.16f),
+                            radius = orbitRadius,
+                            center = orbitCenter,
+                            style = glowStroke
+                        )
+                        drawCircle(
+                            color = WaqtGoldBright.copy(alpha = 0.85f),
+                            radius = 3.dp.toPx(),
+                            center = starPos
+                        )
+                        drawPath(
+                            path = arch,
+                            color = WaqtGoldSoft.copy(alpha = 0.14f),
+                            style = archStroke
+                        )
+                    }
                 }
-                drawPath(
-                    path = arch,
-                    color = WaqtGoldSoft.copy(alpha = 0.12f),
-                    style = Stroke(width = 1.5.dp.toPx())
-                )
-            }
-
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp)
+                    .padding(18.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -536,30 +546,36 @@ private fun HeroCountdownCard(
                         Text(
                             text = dateLabel,
                             style = MaterialTheme.typography.labelLarge,
-                            color = WaqtGoldSoft
+                            color = WaqtGoldSoft,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = hijriLabel,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White.copy(alpha = 0.78f)
+                            color = Color.White.copy(alpha = 0.80f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
 
-                    // Pulsing Live Waqt Status Pill
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // Current Waqt Glass Pill
                     Surface(
-                        color = Color.White.copy(alpha = 0.10f),
+                        color = Color.White.copy(alpha = 0.12f),
                         shape = RoundedCornerShape(50),
                         border = BorderStroke(1.dp, WaqtGold.copy(alpha = 0.45f))
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(8.dp)
+                                    .size(7.dp)
                                     .clip(CircleShape)
-                                    .background(WaqtGoldBright.copy(alpha = pulseAlpha))
+                                    .background(WaqtGoldBright)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
@@ -569,13 +585,16 @@ private fun HeroCountdownCard(
                                     strings.noFardWaqtLabel
                                 },
                                 style = MaterialTheme.typography.labelMedium,
-                                color = WaqtGoldSoft
+                                color = WaqtGoldSoft,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -586,23 +605,26 @@ private fun HeroCountdownCard(
                         Text(
                             text = strings.nextPrayerLabel,
                             style = MaterialTheme.typography.labelMedium,
-                            color = Color.White.copy(alpha = 0.74f)
+                            color = Color.White.copy(alpha = 0.76f),
+                            maxLines = 1
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         AnimatedContent(
                             targetState = strings.prayerName(nextPrayer),
                             transitionSpec = {
-                                fadeIn(tween(240)) togetherWith fadeOut(tween(180))
+                                fadeIn(tween(200)) togetherWith fadeOut(tween(150))
                             },
                             label = "next_prayer_title"
                         ) { label ->
                             Text(
                                 text = label,
                                 style = MaterialTheme.typography.headlineMedium.copy(
-                                    fontSize = 28.sp,
+                                    fontSize = 25.sp,
                                     fontWeight = FontWeight.Bold
                                 ),
-                                color = Color.White
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                         Text(
@@ -611,75 +633,59 @@ private fun HeroCountdownCard(
                                 strings.language
                             ),
                             style = MaterialTheme.typography.titleMedium,
-                            color = WaqtGoldBright
+                            color = WaqtGoldBright,
+                            maxLines = 1
                         )
                     }
 
-                    // Circular Elapsed Progress Ring + Countdown
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            text = strings.remainingLabel,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = Color.White.copy(alpha = 0.74f)
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Canvas(modifier = Modifier.size(26.dp)) {
-                                val stroke = 3.dp.toPx()
-                                drawArc(
-                                    color = Color.White.copy(alpha = 0.16f),
-                                    startAngle = -90f,
-                                    sweepAngle = 360f,
-                                    useCenter = false,
-                                    size = Size(size.width, size.height),
-                                    style = Stroke(width = stroke)
-                                )
-                                drawArc(
-                                    color = WaqtGoldBright,
-                                    startAngle = -90f,
-                                    sweepAngle = 360f * animatedProgress,
-                                    useCenter = false,
-                                    size = Size(size.width, size.height),
-                                    style = Stroke(width = stroke, cap = StrokeCap.Round)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = countdownText,
-                                style = MaterialTheme.typography.displayLarge.copy(
-                                    fontSize = 30.sp,
-                                    fontWeight = FontWeight.Bold
-                                ),
-                                color = WaqtGoldBright,
-                                modifier = Modifier.testTag("hero_countdown_text")
-                            )
-                        }
-                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    // Isolated 1-second leaf composable — strict single-line compact countdown
+                    HeroLiveCountdownValue(
+                        liveClockFlow = liveClockFlow,
+                        language = strings.language,
+                        strings = strings
+                    )
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Sleek Horizontal Glass Waqt Progress Bar (replaces bulky side circle so countdown stays 1-line)
+                HeroLiveProgressBar(
+                    liveClockFlow = liveClockFlow,
+                    reduceMotion = reduceMotion
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
 
                 // Frosted Glass Bottom Strip inside Hero
                 Surface(
-                    color = Color.White.copy(alpha = 0.08f),
+                    color = Color.White.copy(alpha = 0.10f),
                     shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(0.8.dp, Color.White.copy(alpha = 0.14f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 12.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = "${strings.sunriseLabel}: ${BengaliFormatter.formatTime(schedule.sunrise, strings.language)}",
                             style = MaterialTheme.typography.labelMedium,
-                            color = Color.White.copy(alpha = 0.85f)
+                            color = Color.White.copy(alpha = 0.88f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "${strings.sehriEndLabel}: ${BengaliFormatter.formatShortTime(schedule.sehriEnd, strings.language)} • ${strings.iftarStartLabel}: ${BengaliFormatter.formatShortTime(schedule.iftarStart, strings.language)}",
                             style = MaterialTheme.typography.labelMedium,
-                            color = WaqtGoldSoft
+                            color = WaqtGoldSoft,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -689,30 +695,114 @@ private fun HeroCountdownCard(
 }
 
 @Composable
+private fun HeroLiveCountdownValue(
+    liveClockFlow: StateFlow<LiveClockState>,
+    language: AppLanguage,
+    strings: WaqtStrings
+) {
+    val liveClock by liveClockFlow.collectAsStateWithLifecycle()
+    val countdownText = liveClock.periodStatus?.let {
+        BengaliFormatter.formatCountdown(it.countdown, language)
+    } ?: "--:--:--"
+
+    Column(horizontalAlignment = Alignment.End) {
+        Text(
+            text = strings.remainingLabel,
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.White.copy(alpha = 0.78f),
+            maxLines = 1,
+            softWrap = false
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Surface(
+            color = Color.White.copy(alpha = 0.10f),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, WaqtGold.copy(alpha = 0.42f))
+        ) {
+            Text(
+                text = countdownText,
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFeatureSettings = "tnum"
+                ),
+                color = WaqtGoldBright,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Clip,
+                modifier = Modifier
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                    .testTag("hero_countdown_text")
+            )
+        }
+    }
+}
+
+@Composable
+private fun HeroLiveProgressBar(
+    liveClockFlow: StateFlow<LiveClockState>,
+    reduceMotion: Boolean
+) {
+    val liveClock by liveClockFlow.collectAsStateWithLifecycle()
+    val targetFraction = (liveClock.periodStatus?.elapsedFraction ?: 0f).coerceIn(0f, 1f)
+    val animatedProgress by animateFloatAsState(
+        targetValue = targetFraction,
+        animationSpec = tween(
+            durationMillis = if (reduceMotion) 0 else 450,
+            easing = FastOutSlowInEasing
+        ),
+        label = "waqt_linear_progress"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(5.dp)
+            .clip(RoundedCornerShape(50))
+            .background(Color.White.copy(alpha = 0.14f))
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(animatedProgress.coerceAtLeast(0.03f))
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(50))
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(WaqtGold, WaqtGoldBright)
+                    )
+                )
+        )
+    }
+}
+
+@Composable
 private fun PrayerColorCard(
     prayer: PrayerType,
     timeText: String,
     palette: PrayerCardPalette,
+    isDark: Boolean,
     isCurrent: Boolean,
     isNext: Boolean,
     isAlertEnabled: Boolean,
     reduceMotion: Boolean,
     strings: WaqtStrings,
-    onToggleAlert: () -> Unit
+    onToggleAlert: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val borderColor = when {
         isCurrent -> palette.accent
         isNext -> WaqtGold
-        else -> palette.accent.copy(alpha = 0.32f)
+        else -> palette.accent.copy(alpha = 0.34f)
     }
+    val cardContainerColor = palette.container.copy(alpha = if (isDark) 0.62f else 0.72f)
+    val bellInteraction = remember { MutableInteractionSource() }
 
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .waqtPressScale(reduceMotion = reduceMotion)
             .testTag("prayer_card_${prayer.name.lowercase()}"),
         shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = palette.container.copy(alpha = 0.86f)),
+        colors = CardDefaults.cardColors(containerColor = cardContainerColor),
         border = BorderStroke(if (isCurrent || isNext) 1.8.dp else 1.dp, borderColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
@@ -786,18 +876,20 @@ private fun PrayerColorCard(
 
             Text(
                 text = timeText,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
                 fontWeight = FontWeight.Bold,
-                color = palette.accent
+                color = palette.accent,
+                maxLines = 1
             )
 
             Spacer(modifier = Modifier.width(4.dp))
 
             IconButton(
                 onClick = onToggleAlert,
+                interactionSource = bellInteraction,
                 modifier = Modifier
                     .minimumInteractiveComponentSize()
-                    .waqtPressScale(reduceMotion = reduceMotion)
+                    .waqtPressScale(bellInteraction, reduceMotion)
                     .testTag("prayer_alert_toggle_${prayer.name.lowercase()}")
             ) {
                 Icon(
@@ -822,32 +914,35 @@ private fun TahajjudGlassCard(
     language: AppLanguage,
     reduceMotion: Boolean,
     strings: WaqtStrings,
-    onToggleAlarm: () -> Unit
+    onToggleAlarm: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
+    val bellInteraction = remember { MutableInteractionSource() }
+    val cardBrush = remember {
+        Brush.linearGradient(
+            listOf(
+                Color(0xFF141D3D).copy(alpha = 0.78f),
+                Color(0xFF232C5C).copy(alpha = 0.72f)
+            )
+        )
+    }
+
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .waqtPressScale(reduceMotion = reduceMotion)
             .testTag("tahajjud_section_card"),
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF151F42).copy(alpha = 0.90f)),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
         border = BorderStroke(
             width = if (isActiveNow) 1.8.dp else 1.1.dp,
-            color = if (isActiveNow) WaqtGoldBright else WaqtGold.copy(alpha = 0.35f)
+            color = if (isActiveNow) WaqtGoldBright else WaqtGold.copy(alpha = 0.42f)
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    Brush.linearGradient(
-                        listOf(
-                            Color(0xFF141D3D).copy(alpha = 0.92f),
-                            Color(0xFF232C5C).copy(alpha = 0.86f)
-                        )
-                    )
-                )
+                .background(cardBrush)
                 .padding(16.dp)
         ) {
             Row(
@@ -891,9 +986,10 @@ private fun TahajjudGlassCard(
 
                 IconButton(
                     onClick = onToggleAlarm,
+                    interactionSource = bellInteraction,
                     modifier = Modifier
                         .minimumInteractiveComponentSize()
-                        .waqtPressScale(reduceMotion = reduceMotion)
+                        .waqtPressScale(bellInteraction, reduceMotion)
                         .testTag("tahajjud_alarm_toggle")
                 ) {
                     Icon(
@@ -983,7 +1079,7 @@ private fun TahajjudTimePill(
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = value,
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
                 fontWeight = FontWeight.Bold,
                 color = if (highlight) WaqtGoldBright else Color.White,
                 maxLines = 1,
