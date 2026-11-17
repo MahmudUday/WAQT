@@ -29,7 +29,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -82,7 +81,7 @@ import com.example.ui.LiveClockState
 import com.example.ui.WaqtUiState
 import com.example.ui.components.WaqtGlassCard
 import com.example.ui.components.waqtPressScale
-import com.example.ui.components.waqtScrollItemMotion
+import com.example.ui.components.waqtScrollReveal
 import com.example.ui.strings.WaqtStrings
 import com.example.ui.theme.PrayerAsrAccent
 import com.example.ui.theme.PrayerAsrTintDark
@@ -159,7 +158,6 @@ fun HomeScreen(
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
     }
     val schedule = uiState.todaySchedule
-    val listState = rememberLazyListState()
 
     val dateLabel = remember(uiState.todayDate, settings.language) {
         BengaliFormatter.formatDate(uiState.todayDate, settings.language)
@@ -173,7 +171,6 @@ fun HomeScreen(
         contentAlignment = Alignment.TopCenter
     ) {
         LazyColumn(
-            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .widthIn(max = 720.dp)
@@ -182,7 +179,7 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // Glassmorphic Brand & Location Bar
-            item(key = "header") {
+            item(key = "header", contentType = "header") {
                 WaqtHeaderBar(
                     locationNameBn = settings.locationNameBn,
                     locationNameEn = settings.locationNameEn,
@@ -190,24 +187,26 @@ fun HomeScreen(
                     strings = strings,
                     reduceMotion = settings.reduceMotion,
                     onOpenLocationPicker = onOpenLocationPicker,
-                    modifier = Modifier.waqtScrollItemMotion(listState, "header", settings.reduceMotion)
+                    modifier = Modifier
+                        .animateItem()
+                        .waqtScrollReveal(settings.reduceMotion)
                 )
             }
 
             // Offline / Cached Schedule Indicator
-            item(key = "offline_pill") {
+            item(key = "offline_pill", contentType = "pill") {
                 OfflineStatusPill(
                     isOnline = uiState.isOnline,
                     isFromCache = uiState.isUsingCachedFallback,
                     isRamadan = uiState.hijriDate.isRamadan,
                     strings = strings,
-                    modifier = Modifier.waqtScrollItemMotion(listState, "offline_pill", settings.reduceMotion)
+                    modifier = Modifier.animateItem()
                 )
             }
 
             // Translucent Glassmorphic WAQT Hero Section (1-second countdown isolated inside)
             if (schedule != null && periodSummary.available) {
-                item(key = "hero_card") {
+                item(key = "hero_card", contentType = "hero") {
                     HeroCountdownCard(
                         schedule = schedule,
                         currentPrayer = periodSummary.currentPrayer,
@@ -217,14 +216,17 @@ fun HomeScreen(
                         hijriLabel = hijriLabel,
                         reduceMotion = settings.reduceMotion,
                         strings = strings,
-                        modifier = Modifier.waqtScrollItemMotion(listState, "hero_card", settings.reduceMotion)
+                        modifier = Modifier
+                            .animateItem()
+                            .waqtScrollReveal(settings.reduceMotion)
                     )
                 }
 
                 // Five Distinct Color Glass Prayer Cards (no per-second recomposition!)
                 items(
                     items = PrayerType.entries,
-                    key = { it.name }
+                    key = { it.name },
+                    contentType = { "prayer_card" }
                 ) { prayer ->
                     val palette = remember(prayer, isDark) { prayerPalette(prayer, isDark) }
                     val isCurrent = periodSummary.currentPrayer == prayer
@@ -245,14 +247,16 @@ fun HomeScreen(
                         reduceMotion = settings.reduceMotion,
                         strings = strings,
                         onToggleAlert = { onTogglePrayerAlert(prayer, !isAlertEnabled) },
-                        modifier = Modifier.waqtScrollItemMotion(listState, prayer.name, settings.reduceMotion)
+                        modifier = Modifier
+                            .animateItem()
+                            .waqtScrollReveal(settings.reduceMotion)
                     )
                 }
             }
 
             // Dedicated Tahajjud Prayer Section
             uiState.tahajjudSchedule?.let { tahajjud ->
-                item(key = "tahajjud_section") {
+                item(key = "tahajjud_section", contentType = "tahajjud") {
                     TahajjudGlassCard(
                         tahajjud = tahajjud,
                         isActiveNow = isTahajjudActive,
@@ -261,12 +265,14 @@ fun HomeScreen(
                         reduceMotion = settings.reduceMotion,
                         strings = strings,
                         onToggleAlarm = { onToggleTahajjudAlert(!settings.tahajjudAlertEnabled) },
-                        modifier = Modifier.waqtScrollItemMotion(listState, "tahajjud_section", settings.reduceMotion)
+                        modifier = Modifier
+                            .animateItem()
+                            .waqtScrollReveal(settings.reduceMotion)
                     )
                 }
             }
 
-            item(key = "bottom_spacer") {
+            item(key = "bottom_spacer", contentType = "spacer") {
                 Spacer(modifier = Modifier.height(14.dp))
             }
         }

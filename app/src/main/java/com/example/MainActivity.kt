@@ -139,13 +139,21 @@ fun WaqtApp(viewModel: MainViewModel) {
     val currentRoute = navBackStackEntry?.destination?.route ?: WaqtDestination.TODAY.route
     var showLocationSheet by remember { mutableStateOf(false) }
 
-    val navigateTo: (String) -> Unit = { route ->
-        navController.navigate(route) {
-            popUpTo(navController.graph.findStartDestination().id) {
-                saveState = true
+    val navigateTo: (String) -> Unit = remember(navController) {
+        { route ->
+            navController.navigate(route) {
+                popUpTo(navController.graph.findStartDestination().id) {
+                    saveState = true
+                }
+                launchSingleTop = true
+                restoreState = true
             }
-            launchSingleTop = true
-            restoreState = true
+        }
+    }
+    val openLocationPicker: () -> Unit = remember(viewModel) {
+        {
+            viewModel.clearGpsMessage()
+            showLocationSheet = true
         }
     }
 
@@ -266,10 +274,7 @@ fun WaqtApp(viewModel: MainViewModel) {
                                     uiState = uiState,
                                     liveClockFlow = viewModel.liveClock,
                                     strings = strings,
-                                    onOpenLocationPicker = {
-                                        viewModel.clearGpsMessage()
-                                        showLocationSheet = true
-                                    },
+                                    onOpenLocationPicker = openLocationPicker,
                                     onTogglePrayerAlert = viewModel::togglePrayerNotification,
                                     onToggleTahajjudAlert = viewModel::toggleTahajjudAlert
                                 )
@@ -281,10 +286,7 @@ fun WaqtApp(viewModel: MainViewModel) {
                                     strings = strings,
                                     onSelectDate = viewModel::setSehriDate,
                                     onSelectMonth = viewModel::setSehriMonth,
-                                    onOpenLocationPicker = {
-                                        viewModel.clearGpsMessage()
-                                        showLocationSheet = true
-                                    }
+                                    onOpenLocationPicker = openLocationPicker
                                 )
                             }
                             composable(WaqtDestination.ALARMS.route) {
@@ -307,10 +309,7 @@ fun WaqtApp(viewModel: MainViewModel) {
                                     onSelectLanguage = viewModel::setLanguage,
                                     onSelectThemeMode = viewModel::setThemeMode,
                                     onToggleReduceMotion = viewModel::setReduceMotion,
-                                    onOpenLocationPicker = {
-                                        viewModel.clearGpsMessage()
-                                        showLocationSheet = true
-                                    },
+                                    onOpenLocationPicker = openLocationPicker,
                                     onSelectMethod = viewModel::setCalculationMethod,
                                     onSelectAsrJuristic = viewModel::setAsrJuristic
                                 )

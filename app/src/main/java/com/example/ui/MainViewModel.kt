@@ -25,6 +25,7 @@ import com.example.model.ReminderOption
 import com.example.model.TahajjudSchedule
 import com.example.model.ThemeMode
 import com.example.model.UserSettings
+import androidx.compose.runtime.Immutable
 import com.example.notifications.NotificationHelper
 import com.example.notifications.PrayerAlarmScheduler
 import com.example.ui.strings.WaqtStrings
@@ -34,6 +35,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -44,21 +46,24 @@ import java.time.LocalDateTime
 import java.time.YearMonth
 import java.time.ZoneId
 
+@Immutable
 data class SehriIftarTargetCountdown(
     val isSehriNext: Boolean,
     val countdown: Duration
 )
 
 /**
- * Isolated 1-second tick state so only countdown text/arcs recompose each second,
- * keeping LazyColumns and animations lag-free at 90Hz/120Hz.
+ * Isolated 1-second tick state so only countdown text/bars recompose each second,
+ * keeping LazyColumns and animations lag-free at 120Hz/144Hz.
  */
+@Immutable
 data class LiveClockState(
     val periodStatus: PrayerPeriodStatus? = null,
     val sehriIftarCountdown: SehriIftarTargetCountdown? = null,
     val isTahajjudActiveNow: Boolean = false
 )
 
+@Immutable
 data class WaqtUiState(
     val settings: UserSettings = UserSettings(),
     val isOnline: Boolean = true,
@@ -92,10 +97,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _liveClock = MutableStateFlow(createInitialClockState(_uiState.value))
     val liveClock: StateFlow<LiveClockState> = _liveClock.asStateFlow()
 
+    private var lastScheduleKey: String? = null
+    private var lastCacheSavedKey: String? = null
+    private var lastMonthlyKey: String? = null
+
     init {
         NotificationHelper.ensureChannels(appContext)
         refreshSystemPermissionStates()
-        observeSettingsAndCache()
+        observeSettingsAndConnectivity()
         startClockTicker()
     }
 
@@ -165,16 +174,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun observeSettingsAndCache() {
+    private fun observeSettingsAndConnectivity() {
         viewModelScope.launch {
+            val cachedBundle = runCatching {
+                repository.getCachedSchedulesSnapshot()
+            }.getOrElse { CachedScheduleBundle(emptyList(), 0L) }
+
             combine(
-                repository.settingsFlow,
-                repository.cachedSchedulesFlow,
-                ConnectivityObserver.observeOnlineStatus(appContext)
-            ) { settings, cacheBundle, isOnline ->
-                Triple(settings, cacheBundle, isOnline)
-            }.collect { (settings, cacheBundle, isOnline) ->
-                recomputeSchedules(settings, cacheBundle, isOnline)
+                repository.settingsFlow.distinctUntilChanged(),
+                ConnectivityObserver.observeOnlineStatus(appContext).distinctUntilChanged()
+            ) { settings, isOnline ->
+                settings to isOnline
+            }.collect { (settings, isOnline) ->
+                recomputeSchedulesIfNeeded(settings, cachedBundle, isOnline)
             }
         }
     }
@@ -182,14 +194,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun startClockTicker() {
         viewModelScope.launch {
             while (isActive) {
+                val nowMs = System.currentTimeMillis()
                 val zoneId = ZoneId.systemDefault()
                 val now = LocalDateTime.now(zoneId)
                 val currentDate = now.toLocalDate()
                 val state = _uiState.value
 
                 if (currentDate != state.todayDate || state.todaySchedule == null) {
-                    val freshBundle = CachedScheduleBundle(state.cachedSchedules, System.currentTimeMillis())
-                    recomputeSchedules(state.settings, freshBundle, state.isOnline)
+                    val freshBundle = CachedScheduleBundle(state.cachedSchedules, nowMs)
+                    recomputeSchedulesIfNeeded(state.settings, freshBundle, state.isOnline)
                 } else {
                     val todaySched = state.todaySchedule
                     val tomorrowSched = state.tomorrowSchedule ?: todaySched
@@ -209,12 +222,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         isTahajjudActiveNow = tahajjudActive
                     )
                 }
-                delay(1000L)
+                val delayMs = (1000L - (System.currentTimeMillis() % 1000L)).coerceIn(250L, 1000L)
+                delay(delayMs)
             }
         }
     }
 
-    private suspend fun recomputeSchedules(
+    private suspend fun recomputeSchedulesIfNeeded(
         settings: UserSettings,
         cacheBundle: CachedScheduleBundle,
         isOnline: Boolean
@@ -222,66 +236,99 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val zoneId = ZoneId.systemDefault()
         val now = LocalDateTime.now(zoneId)
         val today = now.toLocalDate()
-
-        val computed = withContext(Dispatchers.Default) {
-            runCatching {
-                PrayerTimeCalculator.calculateRange(
-                    startDate = today,
-                    days = 7,
-                    latitude = settings.latitude,
-                    longitude = settings.longitude,
-                    locationNameEn = settings.locationNameEn,
-                    locationNameBn = settings.locationNameBn,
-                    method = settings.calculationMethod,
-                    asrJuristic = settings.asrJuristic,
-                    zoneId = zoneId
-                )
-            }.getOrNull()
-        }
-
-        val matchingCache = cacheBundle.schedules.filter {
-            !it.date.isBefore(today) &&
-                it.methodId == settings.calculationMethod.id &&
-                it.asrJuristicId == settings.asrJuristic.id
-        }
-
-        val activeSevenDays: List<DailyPrayerSchedule>
-        val usingCache: Boolean
-
-        if (computed != null && computed.isNotEmpty()) {
-            activeSevenDays = if (!isOnline && matchingCache.any { it.date == today }) {
-                computed.map { it.copy(isFromCache = true) }
-            } else {
-                computed
-            }
-            usingCache = !isOnline
-            viewModelScope.launch(Dispatchers.IO) {
-                runCatching { repository.saveCachedSchedules(computed) }
-            }
-        } else {
-            activeSevenDays = matchingCache
-            usingCache = true
-        }
-
-        val todaySched = activeSevenDays.firstOrNull { it.date == today }
-            ?: calculateSingleDay(today, settings, zoneId)
-        val tomorrowSched = activeSevenDays.firstOrNull { it.date == today.plusDays(1) }
-            ?: calculateSingleDay(today.plusDays(1), settings, zoneId)
-        val yesterdaySched = calculateSingleDay(today.minusDays(1), settings, zoneId)
-
-        val tahajjudSched = PrayerTimeCalculator.calculateTahajjud(
-            now = now,
-            yesterdaySchedule = yesterdaySched,
-            todaySchedule = todaySched,
-            tomorrowSchedule = tomorrowSched
-        )
+        val scheduleKey = "$today|${settings.selectedDistrictId}|${settings.latitude}|${settings.longitude}|" +
+            "${settings.locationNameEn}|${settings.calculationMethod.id}|${settings.asrJuristic.id}|${zoneId.id}"
 
         val currentState = _uiState.value
         val sehriDate = currentState.selectedSehriDate
         val sehriMonth = currentState.selectedSehriMonth
+        val monthlyKey = "$sehriMonth|${settings.latitude}|${settings.longitude}|${settings.calculationMethod.id}|${settings.asrJuristic.id}|${zoneId.id}"
 
-        val selectedSehriSchedule = calculateSingleDay(sehriDate, settings, zoneId)
-        val monthlySehriSchedules = calculateMonth(sehriMonth, settings, zoneId)
+        val needsScheduleRecompute = scheduleKey != lastScheduleKey || currentState.todaySchedule == null
+        val needsMonthlyRecompute = monthlyKey != lastMonthlyKey || currentState.monthlySehriSchedules.isEmpty()
+
+        val todaySched: DailyPrayerSchedule
+        val tomorrowSched: DailyPrayerSchedule
+        val tahajjudSched: TahajjudSchedule
+        val activeSevenDays: List<DailyPrayerSchedule>
+        val usingCache: Boolean
+        val selectedSehriSchedule: DailyPrayerSchedule
+
+        if (needsScheduleRecompute) {
+            val computed = withContext(Dispatchers.Default) {
+                runCatching {
+                    PrayerTimeCalculator.calculateRange(
+                        startDate = today,
+                        days = 7,
+                        latitude = settings.latitude,
+                        longitude = settings.longitude,
+                        locationNameEn = settings.locationNameEn,
+                        locationNameBn = settings.locationNameBn,
+                        method = settings.calculationMethod,
+                        asrJuristic = settings.asrJuristic,
+                        zoneId = zoneId
+                    )
+                }.getOrNull()
+            }
+
+            val matchingCache = cacheBundle.schedules.filter {
+                !it.date.isBefore(today) &&
+                    it.methodId == settings.calculationMethod.id &&
+                    it.asrJuristicId == settings.asrJuristic.id
+            }
+
+            if (computed != null && computed.isNotEmpty()) {
+                activeSevenDays = if (!isOnline && matchingCache.any { it.date == today }) {
+                    computed.map { it.copy(isFromCache = true) }
+                } else {
+                    computed
+                }
+                usingCache = !isOnline
+                if (lastCacheSavedKey != scheduleKey) {
+                    lastCacheSavedKey = scheduleKey
+                    viewModelScope.launch(Dispatchers.IO) {
+                        runCatching { repository.saveCachedSchedules(computed) }
+                    }
+                }
+            } else {
+                activeSevenDays = matchingCache
+                usingCache = true
+            }
+
+            todaySched = activeSevenDays.firstOrNull { it.date == today }
+                ?: calculateSingleDay(today, settings, zoneId)
+            tomorrowSched = activeSevenDays.firstOrNull { it.date == today.plusDays(1) }
+                ?: calculateSingleDay(today.plusDays(1), settings, zoneId)
+            val yesterdaySched = calculateSingleDay(today.minusDays(1), settings, zoneId)
+
+            tahajjudSched = PrayerTimeCalculator.calculateTahajjud(
+                now = now,
+                yesterdaySchedule = yesterdaySched,
+                todaySchedule = todaySched,
+                tomorrowSchedule = tomorrowSched
+            )
+            selectedSehriSchedule = calculateSingleDay(sehriDate, settings, zoneId)
+            lastScheduleKey = scheduleKey
+        } else {
+            activeSevenDays = currentState.cachedSchedules
+            usingCache = !isOnline
+            todaySched = currentState.todaySchedule!!
+            tomorrowSched = currentState.tomorrowSchedule ?: todaySched
+            tahajjudSched = currentState.tahajjudSchedule ?: PrayerTimeCalculator.calculateTahajjud(
+                now = now,
+                yesterdaySchedule = todaySched,
+                todaySchedule = todaySched,
+                tomorrowSchedule = tomorrowSched
+            )
+            selectedSehriSchedule = currentState.selectedSehriSchedule ?: todaySched
+        }
+
+        val monthlySehriSchedules = if (needsMonthlyRecompute) {
+            lastMonthlyKey = monthlyKey
+            calculateMonth(sehriMonth, settings, zoneId)
+        } else {
+            currentState.monthlySehriSchedules
+        }
 
         _uiState.update {
             it.copy(

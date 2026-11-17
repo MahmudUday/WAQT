@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
@@ -71,7 +70,6 @@ fun LocationPickerSheet(
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var searchQuery by remember { mutableStateOf("") }
-    val listState = rememberLazyListState()
     val gpsBtnInteraction = remember { MutableInteractionSource() }
 
     val filteredDistricts = remember(searchQuery) {
@@ -204,7 +202,6 @@ fun LocationPickerSheet(
             Spacer(modifier = Modifier.height(12.dp))
 
             LazyColumn(
-                state = listState,
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 380.dp),
@@ -212,7 +209,8 @@ fun LocationPickerSheet(
             ) {
                 items(
                     items = filteredDistricts,
-                    key = { it.id }
+                    key = { it.id },
+                    contentType = { "district" }
                 ) { district ->
                     val isSelected = district.id == selectedDistrictId
                     val isBn = strings.language == AppLanguage.BENGALI
@@ -223,11 +221,7 @@ fun LocationPickerSheet(
                         "${district.nameBn} • ${district.divisionEn} Division"
                     }
 
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .waqtScrollItemMotion(listState, district.id)
-                    ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()

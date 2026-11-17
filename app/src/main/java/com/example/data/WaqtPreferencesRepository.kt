@@ -25,6 +25,7 @@ import com.example.model.ThemeMode
 import com.example.model.UserSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.json.JSONArray
@@ -71,6 +72,7 @@ class WaqtPreferencesRepository(context: Context) {
             if (e is IOException) emit(emptyPreferences()) else throw e
         }
         .map { prefs -> parseSettings(prefs) }
+        .distinctUntilChanged()
 
     val cachedSchedulesFlow: Flow<CachedScheduleBundle> = dataStore.data
         .catch { e ->
@@ -84,6 +86,9 @@ class WaqtPreferencesRepository(context: Context) {
                 updatedAtEpochMs = updatedAt
             )
         }
+        .distinctUntilChanged { old, new -> old.schedules == new.schedules }
+
+    suspend fun getCachedSchedulesSnapshot(): CachedScheduleBundle = cachedSchedulesFlow.first()
 
     suspend fun getSettingsSnapshot(): UserSettings = settingsFlow.first()
 

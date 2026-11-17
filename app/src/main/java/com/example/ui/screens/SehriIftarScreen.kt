@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bedtime
@@ -60,7 +59,7 @@ import com.example.ui.LiveClockState
 import com.example.ui.WaqtUiState
 import com.example.ui.components.WaqtGlassCard
 import com.example.ui.components.waqtPressScale
-import com.example.ui.components.waqtScrollItemMotion
+import com.example.ui.components.waqtScrollReveal
 import com.example.ui.strings.WaqtStrings
 import com.example.ui.theme.PrayerFajrAccent
 import com.example.ui.theme.PrayerMaghribAccent
@@ -91,7 +90,6 @@ fun SehriIftarScreen(
     val selectedHijri = remember(uiState.selectedSehriDate) {
         HijriCalendarHelper.fromGregorian(uiState.selectedSehriDate)
     }
-    val listState = rememberLazyListState()
 
     val locationInteraction = remember { MutableInteractionSource() }
     val prevDayInteraction = remember { MutableInteractionSource() }
@@ -105,18 +103,17 @@ fun SehriIftarScreen(
         contentAlignment = Alignment.TopCenter
     ) {
         LazyColumn(
-            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .widthIn(max = 720.dp),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item(key = "header") {
+            item(key = "header", contentType = "header") {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .waqtScrollItemMotion(listState, "header", reduceMotion),
+                        .waqtScrollReveal(reduceMotion),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -166,20 +163,20 @@ fun SehriIftarScreen(
                 }
             }
 
-            item(key = "countdown_banner") {
+            item(key = "countdown_banner", contentType = "banner") {
                 SehriCountdownBanner(
                     liveClockFlow = liveClockFlow,
                     language = lang,
                     strings = strings,
-                    modifier = Modifier.waqtScrollItemMotion(listState, "countdown_banner", reduceMotion)
+                    modifier = Modifier.waqtScrollReveal(reduceMotion)
                 )
             }
 
-            item(key = "date_nav") {
+            item(key = "date_nav", contentType = "date_nav") {
                 WaqtGlassCard(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .waqtScrollItemMotion(listState, "date_nav", reduceMotion)
+                        .waqtScrollReveal(reduceMotion)
                 ) {
                     Row(
                         modifier = Modifier
@@ -251,11 +248,11 @@ fun SehriIftarScreen(
             }
 
             if (selectedSchedule != null) {
-                item(key = "sehri_iftar_cards") {
+                item(key = "sehri_iftar_cards", contentType = "boundary_cards") {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .waqtScrollItemMotion(listState, "sehri_iftar_cards", reduceMotion),
+                            .waqtScrollReveal(reduceMotion),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         FastingBoundaryCard(
@@ -282,12 +279,10 @@ fun SehriIftarScreen(
                 }
             }
 
-            item(key = "month_header") {
+            item(key = "month_header", contentType = "month_header") {
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .waqtScrollItemMotion(listState, "month_header", reduceMotion),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -336,14 +331,12 @@ fun SehriIftarScreen(
                 }
             }
 
-            item(key = "table_columns") {
+            item(key = "table_columns", contentType = "table_header") {
                 Surface(
                     color = WaqtNavy.copy(alpha = 0.80f),
                     shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
                     border = BorderStroke(1.dp, WaqtGold.copy(alpha = 0.30f)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .waqtScrollItemMotion(listState, "table_columns", reduceMotion)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
                         modifier = Modifier
@@ -377,20 +370,19 @@ fun SehriIftarScreen(
 
             items(
                 items = uiState.monthlySehriSchedules,
-                key = { it.date.toString() }
+                key = { it.date.toString() },
+                contentType = { "monthly_row" }
             ) { daySchedule ->
-                val dateKey = daySchedule.date.toString()
                 MonthlySehriRow(
                     schedule = daySchedule,
                     isToday = daySchedule.date == uiState.todayDate,
                     isSelected = daySchedule.date == uiState.selectedSehriDate,
                     language = lang,
-                    onClick = { onSelectDate(daySchedule.date) },
-                    modifier = Modifier.waqtScrollItemMotion(listState, dateKey, reduceMotion)
+                    onClick = { onSelectDate(daySchedule.date) }
                 )
             }
 
-            item(key = "bottom_space") {
+            item(key = "bottom_space", contentType = "spacer") {
                 Spacer(modifier = Modifier.height(14.dp))
             }
         }

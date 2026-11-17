@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
@@ -64,7 +63,7 @@ import com.example.model.ThemeMode
 import com.example.ui.WaqtUiState
 import com.example.ui.components.WaqtGlassCard
 import com.example.ui.components.waqtPressScale
-import com.example.ui.components.waqtScrollItemMotion
+import com.example.ui.components.waqtScrollReveal
 import com.example.ui.strings.WaqtStrings
 import com.example.ui.theme.WaqtGold
 import com.example.ui.theme.WaqtGoldSoft
@@ -90,7 +89,6 @@ fun SettingsScreen(
     } else {
         settings.locationNameEn
     }
-    val listState = rememberLazyListState()
     val locationCardInteraction = remember { MutableInteractionSource() }
 
     Box(
@@ -98,27 +96,26 @@ fun SettingsScreen(
         contentAlignment = Alignment.TopCenter
     ) {
         LazyColumn(
-            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .widthIn(max = 720.dp),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item(key = "header") {
+            item(key = "header", contentType = "header") {
                 Text(
                     text = strings.settingsTitle,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.waqtScrollItemMotion(listState, "header", reduceMotion)
+                    modifier = Modifier.waqtScrollReveal(reduceMotion)
                 )
             }
 
-            item(key = "location_card") {
+            item(key = "location_card", contentType = "card") {
                 WaqtGlassCard(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .waqtScrollItemMotion(listState, "location_card", reduceMotion)
+                        .waqtScrollReveal(reduceMotion)
                         .waqtPressScale(locationCardInteraction, reduceMotion)
                         .clip(RoundedCornerShape(20.dp))
                         .clickable(
@@ -157,11 +154,11 @@ fun SettingsScreen(
             }
 
             // Language, Theme (Dark/Light/System) & Reduce Motion
-            item(key = "appearance_card") {
+            item(key = "appearance_card", contentType = "card") {
                 WaqtGlassCard(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .waqtScrollItemMotion(listState, "appearance_card", reduceMotion)
+                        .waqtScrollReveal(reduceMotion)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
@@ -269,11 +266,11 @@ fun SettingsScreen(
             }
 
             // Calculation Method & Asr Juristic Rule
-            item(key = "calculation_card") {
+            item(key = "calculation_card", contentType = "card") {
                 WaqtGlassCard(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .waqtScrollItemMotion(listState, "calculation_card", reduceMotion)
+                        .waqtScrollReveal(reduceMotion)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
@@ -355,7 +352,7 @@ fun SettingsScreen(
             }
 
             // Preserved About Us & Developer Identity Card
-            item(key = "about_card") {
+            item(key = "about_card", contentType = "card") {
                 Card(
                     shape = RoundedCornerShape(22.dp),
                     colors = CardDefaults.cardColors(containerColor = WaqtNavy.copy(alpha = 0.78f)),
@@ -363,7 +360,7 @@ fun SettingsScreen(
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .waqtScrollItemMotion(listState, "about_card", reduceMotion)
+                        .waqtScrollReveal(reduceMotion)
                         .testTag("about_us_card")
                 ) {
                     Column(modifier = Modifier.padding(18.dp)) {

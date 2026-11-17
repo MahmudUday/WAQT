@@ -1,8 +1,11 @@
 package com.example.ui.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -12,12 +15,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -28,20 +31,18 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.model.ThemeMode
-import com.example.ui.theme.PrayerFajrAccent
-import com.example.ui.theme.PrayerIshaAccent
 import com.example.ui.theme.WaqtCreamBg
 import com.example.ui.theme.WaqtGold
 import com.example.ui.theme.WaqtNavy
 import com.example.ui.theme.WaqtNavyDeep
-import kotlin.math.abs
 
 /**
  * Lightweight GPU-only press-scale animation backed by Compose's existing InteractionSource.
- * Never intercepts scroll gestures or allocates raw pointerInput coroutines.
+ * Reads animation state strictly in the graphicsLayer phase (zero button recomposition on press).
  */
 fun Modifier.waqtPressScale(
     interactionSource: MutableInteractionSource,
@@ -49,7 +50,7 @@ fun Modifier.waqtPressScale(
 ): Modifier = composed {
     if (reduceMotion) return@composed this
     val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(
+    val scaleState = animateFloatAsState(
         targetValue = if (isPressed) 0.965f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
@@ -58,44 +59,36 @@ fun Modifier.waqtPressScale(
         label = "waqt_press_scale"
     )
     this.graphicsLayer {
-        scaleX = scale
-        scaleY = scale
+        val s = scaleState.value
+        scaleX = s
+        scaleY = s
     }
 }
 
 /**
- * 120Hz/144Hz GPU-accelerated scroll item animation.
- * Reads LazyListState.layoutInfo exclusively inside graphicsLayer{} (render phase) so it
- * causes ZERO composition or layout passes during fast flings.
+ * Ultra-light 120Hz/144Hz GPU-only scroll reveal animation.
+ * Uses pure RenderNode translationY (no alpha saveLayer FBOs, no text resampling scale,
+ * and zero per-frame layoutInfo snapshot reads during scroll).
  */
-fun Modifier.waqtScrollItemMotion(
-    listState: LazyListState,
-    itemKey: Any,
+fun Modifier.waqtScrollReveal(
     reduceMotion: Boolean = false
-): Modifier {
-    if (reduceMotion) return this
-    return this.graphicsLayer {
-        val layoutInfo = listState.layoutInfo
-        val itemInfo = layoutInfo.visibleItemsInfo.firstOrNull { it.key == itemKey }
-        if (itemInfo != null) {
-            val viewportHeight = (layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset)
-                .coerceAtLeast(1)
-                .toFloat()
-            val itemCenter = itemInfo.offset + itemInfo.size * 0.5f
-            val viewportCenter = layoutInfo.viewportStartOffset + viewportHeight * 0.5f
-            val normalizedDistance = (abs(itemCenter - viewportCenter) / (viewportHeight * 0.64f))
-                .coerceIn(0f, 1f)
-            val edgeFactor = (normalizedDistance - 0.52f).coerceAtLeast(0f) / 0.48f
-            val scale = 1f - (edgeFactor * 0.04f)
-            scaleX = scale
-            scaleY = scale
-            alpha = 1f - (edgeFactor * 0.18f)
-        }
+): Modifier = composed {
+    if (reduceMotion) return@composed this
+    val glideOffsetPx = with(LocalDensity.current) { 14.dp.toPx() }
+    val progress = remember { Animatable(1f) }
+    LaunchedEffect(Unit) {
+        progress.animateTo(
+            targetValue = 0f,
+            animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing)
+        )
+    }
+    this.graphicsLayer {
+        translationY = glideOffsetPx * progress.value
     }
 }
 
 /**
- * Ambient luminous backdrop with size-cached gradients (zero per-frame allocation, zero blur).
+ * Ambient luminous backdrop with single-pass cached gradients (minimal pixel overdraw, zero blur).
  */
 @Composable
 fun WaqtAmbientBackground(
@@ -120,10 +113,7 @@ fun WaqtAmbientBackground(
         }
     }
 
-    val goldGlowColor = remember(isDark) { WaqtGold.copy(alpha = if (isDark) 0.17f else 0.18f) }
-    val indigoGlowColor = remember(isDark) {
-        (if (isDark) PrayerIshaAccent else PrayerFajrAccent).copy(alpha = if (isDark) 0.18f else 0.10f)
-    }
+    val goldGlowColor = remember(isDark) { WaqtGold.copy(alpha = if (isDark) 0.16f else 0.15f) }
 
     Box(
         modifier = Modifier
@@ -132,23 +122,15 @@ fun WaqtAmbientBackground(
             .drawWithCache {
                 val w = size.width
                 val h = size.height
-                val goldCenter = Offset(w * 0.86f, h * 0.10f)
-                val goldRadius = (w * 0.64f).coerceAtLeast(1f)
+                val goldCenter = Offset(w * 0.85f, h * 0.12f)
+                val goldRadius = (w * 0.62f).coerceAtLeast(1f)
                 val goldBrush = Brush.radialGradient(
                     colors = listOf(goldGlowColor, Color.Transparent),
                     center = goldCenter,
                     radius = goldRadius
                 )
-                val indigoCenter = Offset(w * 0.12f, h * 0.56f)
-                val indigoRadius = (w * 0.70f).coerceAtLeast(1f)
-                val indigoBrush = Brush.radialGradient(
-                    colors = listOf(indigoGlowColor, Color.Transparent),
-                    center = indigoCenter,
-                    radius = indigoRadius
-                )
                 onDrawBehind {
                     drawCircle(brush = goldBrush, radius = goldRadius, center = goldCenter)
-                    drawCircle(brush = indigoBrush, radius = indigoRadius, center = indigoCenter)
                 }
             }
     ) {
@@ -170,9 +152,9 @@ fun WaqtGlassCard(
 ) {
     val isDark = MaterialTheme.colorScheme.background == WaqtNavyDeep
     val glassBg = tintColor ?: if (isDark) {
-        Color(0xFF132A4E).copy(alpha = 0.62f)
+        Color(0xFF132A4E).copy(alpha = 0.66f)
     } else {
-        Color.White.copy(alpha = 0.68f)
+        Color.White.copy(alpha = 0.74f)
     }
     val edgeColor = borderColor ?: if (isDark) {
         WaqtGold.copy(alpha = 0.28f)

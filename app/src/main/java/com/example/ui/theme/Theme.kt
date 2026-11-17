@@ -8,7 +8,7 @@ import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
@@ -83,7 +83,7 @@ fun WaqtTheme(
 
     val view = LocalView.current
     if (!view.isInEditMode) {
-        SideEffect {
+        LaunchedEffect(useDarkTheme, view) {
             val window = (view.context as? Activity)?.window
             if (window != null) {
                 WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !useDarkTheme
